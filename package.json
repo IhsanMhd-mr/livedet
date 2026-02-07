@@ -1,0 +1,43 @@
+{
+  "name": "livedet",
+  "version": "1.0.0",
+  "description": "Live Detection System with FastAPI Backend and React Frontend",
+  "type": "module",
+  "main": "server.js",
+  "scripts": {
+    "dev": "node server.js",
+    "start": "NODE_ENV=production node server.js",
+    "build": "npm run build:frontend",
+    "build:frontend": "cd frontend && npm run build",
+    "install:all": "npm install && cd backend && pip install -r requirements.txt && cd ../frontend && npm install",
+    "dev:backend": "cd backend && python -m uvicorn app.main:app --reload",
+    "dev:frontend": "cd frontend && npm run dev",
+    "dev:control": "node server.js",
+    "lint": "eslint .",
+    "test": "vitest"
+  },
+  "keywords": [
+    "detection",
+    "fastapi",
+    "react",
+    "websocket",
+    "yolo",
+    "computer-vision"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.18.2",
+    "dotenv": "^16.3.1",
+    "ws": "^8.14.2",
+    "axios": "^1.6.0",
+    "child_process": "^1.0.2",
+    "node-fetch": "^3.3.2"
+  },
+  "devDependencies": {
+    "eslint": "^8.53.0",
+    "nodemon": "^3.0.1",
+    "vitest": "^0.34.6"
+  }
+}
