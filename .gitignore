@@ -1,73 +1,43 @@
-# Dependencies
-node_modules/
+﻿# Python
 __pycache__/
 *.py[cod]
-*$py.class
-*.so
+*.pyo
 .Python
-env/
-venv/
-ENV/
-build/
-develop-eggs/
-dist/
-downloads/
-eggs/
-.eggs/
-lib/
-lib64/
-parts/
-sdist/
-var/
-wheels/
 *.egg-info/
-.installed.cfg
-*.egg
-
-# IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*~
-.DS_Store
-
-# Logs
-logs/
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# Environment
-.env
-.env.local
-.env.*.local
-
-# Build outputs
 dist/
 build/
-frontend/dist/
+.eggs/
 
-# Models (large files)
+# Virtual environments
+venv/
+.venv/
+env/
+venv-gpu/
+
+# Environment / secrets
+.env
+
+# Model weights (large binary files — keep .gitkeep)
 models/*.pt
-models/*.onnx
-models/cache/
+models/*.pth
+!models/.gitkeep
 
-# Data
-data/
-*.db
-database.sqlite
+# Image storage (generated at runtime)
+backend/image_storage/original/
+backend/image_storage/processed/
 
-# Testing
-.pytest_cache/
-.coverage
-htmlcov/
+# Outputs & runs
+outputs/
+runs/
 
-# Runtime
-*.pid
-*.pid.lock
+# Jupyter checkpoints
+.ipynb_checkpoints/
+notebooks/.ipynb_checkpoints/
 
 # OS
-Thumbs.db
 .DS_Store
+Thumbs.db
+
+# IDE
+.vscode/settings.json
+.idea/
