@@ -1,0 +1,14 @@
+FastAPI==0.104.1
+uvicorn==0.24.0
+python-multipart==0.0.6
+websockets==12.0
+torch==2.10.0
+torchvision==0.18.0
+torchaudio==0.18.0
+opencv-python==4.9.0.80
+Pillow==10.2.0
+numpy==1.24.3
+ultralytics==8.1.12
+PyYAML==6.0.1
+python-dotenv==1.0.0
+Pydantic==2.5.0
