@@ -1,13 +1,14 @@
-# Dependencies
-node_modules/
+# Environment variables (device-specific)
+.env
+.env.local
+.env*.local
+
+# Python
 __pycache__/
 *.py[cod]
 *$py.class
 *.so
 .Python
-env/
-venv/
-ENV/
 build/
 develop-eggs/
 dist/
@@ -20,9 +21,40 @@ parts/
 sdist/
 var/
 wheels/
+pip-wheel-metadata/
+share/python-wheels/
 *.egg-info/
 .installed.cfg
 *.egg
+MANIFEST
+
+# Virtual environments
+venv/
+venv-gpu/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Node
+node_modules/
+npm-debug.log
+yarn-error.log
+package-lock.json
+
+# Vite
+dist/
+.vite/
+
+# Flask
+instance/
+.webassets-cache
+
+# PyTorch & ML
+*.pt
+*.pth
+runs/
+*.onnx
 
 # IDE
 .vscode/
@@ -32,42 +64,67 @@ wheels/
 *~
 .DS_Store
 
-# Logs
-logs/
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
 # Environment
 .env
 .env.local
 .env.*.local
 
-# Build outputs
-dist/
-build/
-frontend/dist/
+# OS
+.DS_Store
+Thumbs.db
+Desktop.ini
 
-# Models (large files)
-models/*.pt
-models/*.onnx
-models/cache/
-
-# Data
-data/
-*.db
-database.sqlite
+# Logs
+*.log
+logs/
 
 # Testing
 .pytest_cache/
 .coverage
 htmlcov/
 
-# Runtime
-*.pid
-*.pid.lock
+# Temp files
+*.tmp
+*.temp
+temp/
+tmp/
 
-# OS
-Thumbs.db
-.DS_Store
+# ───────────────────────────────────────────────────────────────
+# LIVEDET Project
+# ───────────────────────────────────────────────────────────────
+
+# Virtual environment (GPU)
+venv-gpu/
+
+# Backend temporary storage
+LIVEDET/backend/image_storage/original/
+LIVEDET/backend/image_storage/processed/
+
+# Notebook outputs & cache
+LIVEDET/outputs/
+LIVEDET/runs/
+.ipynb_checkpoints/
+
+# Model weights (except .gitkeep)
+# LIVEDET/models/*.pt
+!LIVEDET/models/.gitkeep
+
+# dataset
+dataset/
+
+# image_storage
+backend/image_storage/original/
+backend/image_storage/processed/
+
+# Docs
+docs/
+
+# Data (optional - uncomment if storing large datasets locally)
+# dataset/
+# *.zip
+# *.tar
+# *.tar.gz
+
+# Model artifacts (keep if version controlling)
+# runs/
+# final_model/*.pth
