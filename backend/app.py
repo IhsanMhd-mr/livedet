@@ -67,6 +67,8 @@ try:
         confidence_threshold=config.CONFIDENCE_THRESHOLD,
     )
     logger.info("[app] ✓ Detector initialized successfully")
+    if hasattr(config, "BEST_MODEL_NAME") and config.BEST_MODEL_NAME:
+        detector.loaded_model_name = config.BEST_MODEL_NAME
 except Exception as e:
     logger.error(f"[app] Detector initialization failed: {e}")
     detector = None

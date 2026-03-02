@@ -57,11 +57,18 @@ class Config:
         self.LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO").upper()
 
         # Model configuration
-        self.MODEL_TYPE = os.getenv("MODEL_TYPE", "yolov8s")
-        self.BEST_MODEL_PATH = os.getenv(
+        self.MODEL_TYPE = os.getenv("BEST_MODEL_TYPE", os.getenv("MODEL_TYPE", "yolov8s"))
+        self.BEST_MODEL_NAME = os.getenv("BEST_MODEL_NAME", "YOLOv8s-Fresh-Trained")
+        _raw_model_path = os.getenv(
             "BEST_MODEL_PATH",
             str(Path(__file__).parent.parent / "models" / "livedet_best.pt"),
         )
+        # Resolve relative paths against the project root (parent of backend/)
+        _project_root = Path(__file__).parent.parent
+        _model_p = Path(_raw_model_path)
+        if not _model_p.is_absolute():
+            _model_p = (_project_root / _model_p).resolve()
+        self.BEST_MODEL_PATH = str(_model_p)
         self.ACTIVE_MODEL = os.getenv("ACTIVE_MODEL", "BEST_MODEL")
 
         # Inference settings

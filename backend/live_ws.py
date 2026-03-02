@@ -86,6 +86,8 @@ def initialize_models():
         confidence_threshold=cfg.CONFIDENCE_THRESHOLD,
     )
     logger.info("YOLO ✓")
+    if hasattr(cfg, "BEST_MODEL_NAME") and cfg.BEST_MODEL_NAME:
+        detector.loaded_model_name = cfg.BEST_MODEL_NAME
 
     logger.info("Initialising MiDaS depth...")
     midas = DepthEstimator(model_type="MiDaS_small", device=device)
