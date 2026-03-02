@@ -22,13 +22,22 @@ models/*.pt
 models/*.pth
 !models/.gitkeep
 
+
 # Image storage (generated at runtime)
 backend/image_storage/original/
 backend/image_storage/processed/
 
-# Outputs & runs
+# Outputs & runs (except trained model checkpoints)
 outputs/
 runs/
+# But DO track the finetuned best model for production
+# !runs/base_models/
+!runs/base_models/
+!runs/predictions/
+
+# Keep directory structure with .gitkeep files
+./runs/predictions
+./runs/base_models
 
 # Jupyter checkpoints
 .ipynb_checkpoints/
@@ -41,3 +50,6 @@ Thumbs.db
 # IDE
 .vscode/settings.json
 .idea/
+
+# Node Modules
+node_modules/
