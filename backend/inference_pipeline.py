@@ -1,5 +1,5 @@
 """
-Inference Pipeline for POTTY Pothole Detection
+Inference Pipeline for live-detection-ML2 Pothole Detection
 Supports YOLOv11 for object detection with fallback to MobileNetV2 classification
 """
 

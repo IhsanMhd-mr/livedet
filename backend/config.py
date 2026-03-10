@@ -1,5 +1,5 @@
 """
-Configuration loader for POTTY project
+Configuration loader for live-detection-ML2 project
 Reads from .env file for easy cross-device configuration
 """
 
@@ -93,6 +93,6 @@ config = Config()
 
 
 if __name__ == '__main__':
-    print("POTTY Configuration:")
+    print("live-detection-ML2 Configuration:")
     print("=" * 60)
     print(config)

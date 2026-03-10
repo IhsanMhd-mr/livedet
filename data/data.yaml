@@ -1,0 +1,11 @@
+﻿path: C:\Users\ihsan\Documents\GitHub\ML2\dataset\02_DETAILED_CRACKS_ANNOTATION
+train: images/train
+val: images/val
+test: images/test
+
+nc: 4
+names:
+  0: Pot
+  1: AllCrack
+  2: LongCrack
+  3: LatCrack
