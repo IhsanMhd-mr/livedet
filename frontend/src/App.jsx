@@ -1,49 +1,40 @@
-import React, { useState } from 'react'
-import ImageDetect from './components/ImageDetect'
-import VideoDetect from './components/VideoDetect'
-import LiveDetect from './components/LiveDetect'
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { Toaster } from 'react-hot-toast'
+import ErrorBoundary from '@/components/ErrorBoundary'
+import Layout from '@/components/layout/Layout'
+import Home from '@/pages/Home'
+import ImageDetection from '@/pages/ImageDetection'
+import VideoDetection from '@/pages/VideoDetection'
+import LiveDetection from '@/pages/LiveDetection'
 
 export default function App() {
-  const [mode, setMode] = useState('image')
-
   return (
-    <div className="app-container">
-      <header className="app-header">
-        <h1>LIVEDET — Road Defect Detection</h1>
-        <p>Real-time detection powered by YOLOv8s (finetuned)</p>
-      </header>
+    <ErrorBoundary>
+      <BrowserRouter>
+        <Routes>
+          <Route element={<Layout />}>
+            <Route path="/"      element={<Home />} />
+            <Route path="/image" element={<ImageDetection />} />
+            <Route path="/video" element={<VideoDetection />} />
+            <Route path="/live"  element={<LiveDetection />} />
+          </Route>
+        </Routes>
+      </BrowserRouter>
 
-      <nav className="mode-selector">
-        <button 
-          className={`mode-btn ${mode === 'image' ? 'active' : ''}`}
-          onClick={() => setMode('image')}
-        >
-          Image Detection
-        </button>
-        <button 
-          className={`mode-btn ${mode === 'video' ? 'active' : ''}`}
-          onClick={() => setMode('video')}
-        >
-          Video Detection
-        </button>
-        <button 
-          className={`mode-btn ${mode === 'live' ? 'active' : ''}`}
-          onClick={() => setMode('live')}
-        >
-          Live Camera
-        </button>
-      </nav>
-
-      <main className="app-main">
-        {mode === 'image' && <ImageDetect />}
-        {mode === 'video' && <VideoDetect />}
-        {mode === 'live' && <LiveDetect />}
-      </main>
-
-      <footer className="app-footer">
-        <p>Final Year Project | ML-powered Infrastructure Monitoring</p>
-        <p>Model: YOLOv8s (Finetuned) | Framework: PyTorch | API: Flask + WebSocket</p>
-      </footer>
-    </div>
+      <Toaster
+        position="bottom-right"
+        toastOptions={{
+          style: {
+            background: '#1e293b',
+            color: '#f1f5f9',
+            border: '1px solid rgba(255,255,255,0.06)',
+            borderRadius: '12px',
+            fontSize: '13px',
+          },
+          success: { iconTheme: { primary: '#10b981', secondary: '#f1f5f9' } },
+          error:   { iconTheme: { primary: '#ef4444', secondary: '#f1f5f9' } },
+        }}
+      />
+    </ErrorBoundary>
   )
 }

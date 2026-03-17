@@ -1,6 +1,6 @@
-# POTTY Model Training Utilities
+# live-detection-ML2 Model Training Utilities
 
-This package contains utility modules for the POTTY pothole detection system.
+This package contains utility modules for the live-detection-ML2 pothole detection system.
 
 ## Modules
 
