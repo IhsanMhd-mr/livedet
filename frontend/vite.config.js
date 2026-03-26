@@ -1,60 +1,41 @@
+import path from 'path'
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    alias: {
+      '@': path.resolve(__dirname, './src'),
+    },
+  },
   server: {
     port: 5173,
     host: 'localhost',
-    // HMR configuration for proper hot module replacement
-    hmr: {
-      protocol: 'ws',
-      host: 'localhost',
-      port: 5173
-    },
-    // Proxy configuration to forward API calls to backend
     proxy: {
-      '/api': {
+      '/ws': {
         target: 'http://localhost:8000',
         changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api/, ''),
-        ws: true
+        ws: true,
       },
       '/predict': {
         target: 'http://localhost:8000',
         changeOrigin: true,
-        ws: true
       },
-      '/images': {
+      '/video': {
         target: 'http://localhost:8000',
         changeOrigin: true,
-        ws: true
       },
-      '/report': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-        ws: true
+    },
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          vendor: ['react', 'react-dom', 'react-router-dom'],
+          ui: ['framer-motion', 'react-hot-toast'],
+        },
       },
-      '/session': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-        ws: true
-      },
-      '/stats': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-        ws: true
-      },
-      '/cleanup': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-        ws: true
-      },
-      '/health': {
-        target: 'http://localhost:8000',
-        changeOrigin: true,
-        ws: true
-      }
-    }
-  }
+    },
+  },
 })
