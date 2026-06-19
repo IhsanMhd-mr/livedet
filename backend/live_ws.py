@@ -160,7 +160,7 @@ async def handle_client(websocket):
                         height_cm = (h / max(fh, 1)) * 50.0
                         depth_cm = (h / max(fh, 1)) * 15.0 + 2.0
 
-                    severity = classify_severity(depth_cm, width_cm, conf)
+                    severity_label, severity_score = classify_severity(depth_cm, width_cm, conf)
 
                     det_out.append({
                         "id": i + 1,
@@ -170,7 +170,8 @@ async def handle_client(websocket):
                         "depth_cm": round(float(depth_cm), 1),
                         "width_cm": round(float(width_cm), 1),
                         "height_cm": round(float(height_cm), 1),
-                        "severity": severity,
+                        "severity": severity_label,
+                        "severity_score": round(float(severity_score), 3),
                     })
 
                 # ── FPS ─────────────────────────────────────────────────

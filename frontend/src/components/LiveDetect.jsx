@@ -171,7 +171,12 @@ export default function LiveDetect() {
 
       for (const d of dets) {
         const [bx, by, bw, bh] = d.bbox
-        const color = SEVERITY_COLORS[d.severity] || '#0f0'
+        const confPercent = Math.round((d.confidence ?? 0) * 100)
+        const color = confPercent > 85
+          ? '#ef4444' // Red
+          : confPercent > 70
+          ? '#eab308' // Yellow
+          : '#10b981' // Green/Accent
 
         // bounding box
         ctx.strokeStyle = color
