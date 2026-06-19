@@ -247,8 +247,12 @@ export default function ImageDetect() {
       
       {error && <div className="message error">{error}</div>}
       {result && !error && (
-        <div className="message success">
-          ✓ Detection Complete — <strong>{result?.count ?? result?.num_potholes ?? 0}</strong> object(s) detected &nbsp;|&nbsp; Session: <code style={{fontSize:'0.9em', backgroundColor:'#fff', padding:'2px 6px', borderRadius:'3px'}}>{sessionId}</code>
+        <div className={`message ${(result?.count ?? result?.num_potholes ?? 0) === 0 ? 'info' : 'success'}`} style={(result?.count ?? result?.num_potholes ?? 0) === 0 ? { backgroundColor: '#d4edda', borderColor: '#c3e6cb', color: '#155724' } : {}}>
+          ✓ Detection Complete — {(result?.count ?? result?.num_potholes ?? 0) === 0 ? (
+            <strong>Clean road! No potholes found. 🎉</strong>
+          ) : (
+            <><strong>{result?.count ?? result?.num_potholes ?? 0}</strong> object(s) detected</>
+          )} &nbsp;|&nbsp; Session: <code style={{fontSize:'0.9em', backgroundColor:'#fff', padding:'2px 6px', borderRadius:'3px'}}>{sessionId}</code>
         </div>
       )}
 
