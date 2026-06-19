@@ -81,12 +81,7 @@ export default function LiveDetection() {
           for (const d of detectionsRef.current) {
             if (!d.bbox) continue
             const [bx, by, bw, bh] = d.bbox
-            const confPercent = Math.round((d.confidence ?? 0) * 100)
-            const color = confPercent > 85
-              ? '#ef4444' // Red
-              : confPercent > 70
-              ? '#eab308' // Yellow
-              : '#10b981' // Green/Accent
+            const color = SEVERITY_COLORS[d.severity] || '#10b981'
 
             ctx.strokeStyle = color; ctx.lineWidth = 2
             ctx.strokeRect(bx, by, bw, bh)
