@@ -6,19 +6,15 @@ export function DetectionCard({ detection, index = 0, mode }) {
   const confPercent = Math.round(confidence * 100)
   
   const severity = detection.severity || 'Low'
-  const severityColors = isImageMode
-    ? {
-        Low:      'from-accent-500 to-accent-400',
-        Medium:   'from-yellow-500 to-yellow-400',
-        High:     'from-orange-500 to-orange-400',
-        Critical: 'from-danger-500 to-danger-400',
-      }
-    : {
-        Low:      'from-accent-500 to-accent-500',
-        Medium:   'from-yellow-500 to-yellow-500',
-        High:     'from-orange-500 to-orange-500',
-        Critical: 'from-danger-500 to-danger-500',
-      }
+  // Bar width represents confidence percentage
+  const barWidth = confPercent
+
+  const severityColors = {
+    Low:      'from-accent-500 to-accent-400',
+    Medium:   'from-yellow-500 to-yellow-400',
+    High:     'from-orange-500 to-orange-400',
+    Critical: 'from-danger-500 to-danger-400',
+  }
   const severityColor = severityColors[severity] || severityColors.Low
 
   const severityBadgeStyles = {
@@ -28,11 +24,6 @@ export function DetectionCard({ detection, index = 0, mode }) {
     Critical: 'text-danger-400 border-danger-500/20 bg-danger-500/5',
   }
   const badgeStyle = severityBadgeStyles[severity] || severityBadgeStyles.Low
-
-  // Bar width represents severity score for image mode, confidence for other modes
-  const barWidth = isImageMode
-    ? Math.round((detection.severity_score ?? confidence) * 100)
-    : confPercent
 
   // Calculate coordinates correctly using nullish coalescing (preventing 0 from falling back to pixel values)
   const xVal = detection.x ?? (detection.bbox ? detection.bbox[0] : 0)
@@ -56,7 +47,7 @@ export function DetectionCard({ detection, index = 0, mode }) {
             {severity}
           </span>
           <span className="text-xs font-mono font-bold text-slate-300">
-            {isImageMode ? `${Math.round((detection.severity_score ?? confidence) * 100)}% Sev` : `${confPercent}%`}
+            {confPercent}%
           </span>
         </div>
       </div>

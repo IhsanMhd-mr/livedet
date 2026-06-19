@@ -66,6 +66,18 @@ def annotate_detections(image: np.ndarray, detections: list) -> np.ndarray:
     """Draw severity-coloured boxes and labels onto a copy of the image."""
     out = image.copy()
     font = cv2.FONT_HERSHEY_SIMPLEX
+    h_img, w_img = image.shape[:2]
+
+    # Set scale factor relative to standard 960x541 image diagonal (1102.0)
+    # to support different aspect ratios and orientations consistently
+    diagonal = np.sqrt(w_img**2 + h_img**2)
+    scale = max(diagonal / 1102.0, 0.5)
+    font_scale_label = 0.55 * scale
+    font_scale_sub = 0.40 * scale
+    thickness = max(int(1 * scale), 1)
+    box_thickness = max(int(2 * scale), 1)
+    pad = max(int(6 * scale), 3)
+    accent_bar_w = max(int(4 * scale), 2)
 
     for det in detections:
         x, y, w, h = det["bbox"]
@@ -77,19 +89,43 @@ def annotate_detections(image: np.ndarray, detections: list) -> np.ndarray:
         color = SEVERITY_COLORS_BGR.get(severity, (0, 255, 0))
 
         # Bounding box
-        cv2.rectangle(out, (x, y), (x + w, y + h), color, 2)
+        cv2.rectangle(out, (x, y), (x + w, y + h), color, box_thickness)
 
         # Label: "#1 Pothole | Severity conf%"
         label = f"#{det_id} {cls_name} | {severity} {conf:.0%}"
-        (tw, th), _ = cv2.getTextSize(label, font, 0.55, 1)
-        cv2.rectangle(out, (x, y - th - 10), (x + tw + 6, y), color, -1)
-        cv2.putText(out, label, (x + 3, y - 4), font, 0.55, (0, 0, 0), 1, cv2.LINE_AA)
-
-        # Sub-label: depth / width / height (placed inside the box with solid black background strip for visibility)
+        # Sub-label: depth / width / height
         sub = f"D:{det.get('depth_cm', 0):.1f}cm  W:{det.get('width_cm', 0):.1f}cm  H:{det.get('height_cm', 0):.1f}cm"
-        (sw, sh), _ = cv2.getTextSize(sub, font, 0.4, 1)
-        cv2.rectangle(out, (x, y), (x + sw + 6, y + sh + 8), (0, 0, 0), -1)
-        cv2.putText(out, sub, (x + 3, y + sh + 4), font, 0.4, color, 1, cv2.LINE_AA)
+
+        (tw, th), _ = cv2.getTextSize(label, font, font_scale_label, thickness)
+        (sw, sh), _ = cv2.getTextSize(sub, font, font_scale_sub, thickness)
+
+        block_w = max(tw, sw) + 2 * pad + accent_bar_w
+        block_h = th + sh + 3 * pad
+
+        # Determine y position (draw inside box if label goes off-screen top)
+        if y - block_h >= 0:
+            by_start = y - block_h
+        else:
+            by_start = y
+            
+        by_end = by_start + block_h
+
+        # Premium Dark navy/slate background block (BGR: 42, 23, 15)
+        bg_color = (42, 23, 15)
+        text_color = (248, 250, 252) # Off-white
+        
+        cv2.rectangle(out, (x, by_start), (x + block_w, by_end), bg_color, -1)
+
+        # Draw left vertical accent bar of the severity color
+        cv2.rectangle(out, (x, by_start), (x + accent_bar_w, by_end), color, -1)
+
+        # Write text lines
+        tx = x + accent_bar_w + pad
+        ty1 = by_start + pad + th
+        cv2.putText(out, label, (tx, ty1), font, font_scale_label, text_color, thickness, cv2.LINE_AA)
+
+        ty2 = by_start + 2 * pad + th + sh
+        cv2.putText(out, sub, (tx, ty2), font, font_scale_sub, color, thickness, cv2.LINE_AA)
 
     return out
 
