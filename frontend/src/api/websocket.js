@@ -4,8 +4,8 @@ export function createWebSocketManager(path) {
 
   return {
     connect() {
-      const wsBase = import.meta.env.VITE_WS_BASE_URL || 'ws://localhost:8000'
-      const url = `${wsBase}${path}`
+      const wsBase = import.meta.env.VITE_WS_BASE_URL || 'ws://localhost:8765'
+      const url = path ? `${wsBase}${path}` : wsBase
 
       socket = new WebSocket(url)
 

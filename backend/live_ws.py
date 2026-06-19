@@ -107,7 +107,7 @@ def initialize_models():
 
 async def handle_client(websocket):
     """Handle one browser client – receive frames, return detections."""
-    import websockets  # noqa: local for type hints
+    # import websockets  # noqa: local for type hints
 
     addr = websocket.remote_address
     logger.info(f"[+] Client connected: {addr}")
@@ -153,9 +153,11 @@ async def handle_client(websocket):
                         med = extract_median_depth(cached_depth, (x, y, w, h))
                         depth_cm = compute_depth_cm(med)
                         width_cm = compute_real_width(float(w), med, focal)
+                        height_cm = compute_real_width(float(h), med, focal)
                     else:
                         # Heuristic fallback
                         width_cm = (w / max(fw, 1)) * 50.0
+                        height_cm = (h / max(fh, 1)) * 50.0
                         depth_cm = (h / max(fh, 1)) * 15.0 + 2.0
 
                     severity = classify_severity(depth_cm, width_cm, conf)
@@ -167,6 +169,7 @@ async def handle_client(websocket):
                         "confidence": round(float(conf), 3),
                         "depth_cm": round(float(depth_cm), 1),
                         "width_cm": round(float(width_cm), 1),
+                        "height_cm": round(float(height_cm), 1),
                         "severity": severity,
                     })
 

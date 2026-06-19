@@ -14,7 +14,7 @@ export default defineConfig({
     host: 'localhost',
     proxy: {
       '/ws': {
-        target: 'http://localhost:8000',
+        target: 'ws://localhost:8765',
         changeOrigin: true,
         ws: true,
       },

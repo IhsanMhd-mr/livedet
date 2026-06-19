@@ -110,12 +110,18 @@ export default function ImageDetection() {
               className="hidden"
             />
             {file ? (
-              <div className="space-y-3 text-center">
-                <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-accent-500/10">
-                  <svg className="h-7 w-7 text-accent-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                  </svg>
-                </div>
+              <div className="space-y-3 text-center w-full h-full flex flex-col items-center justify-center">
+                {preview ? (
+                  <div className="relative overflow-hidden rounded-xl border border-white/5 max-h-48 max-w-full bg-black">
+                    <img src={preview} alt="Selected preview" className="max-h-48 max-w-full object-contain" />
+                  </div>
+                ) : (
+                  <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-xl bg-accent-500/10">
+                    <svg className="h-7 w-7 text-accent-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    </svg>
+                  </div>
+                )}
                 <div>
                   <p className="max-w-xs truncate text-sm font-medium text-slate-200">{file.name}</p>
                   <p className="text-xs text-slate-500">{(file.size / 1024).toFixed(0)} KB</p>
@@ -203,7 +209,7 @@ export default function ImageDetection() {
               </h3>
               <div className="space-y-2">
                 {detections.map((d, i) => (
-                  <DetectionCard key={i} detection={d} index={i} />
+                  <DetectionCard key={i} detection={d} index={i} mode="image" />
                 ))}
               </div>
             </motion.div>

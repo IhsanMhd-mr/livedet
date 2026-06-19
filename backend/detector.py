@@ -36,10 +36,12 @@ class ObjectDetector:
 
     # Maps model-embedded class names → display names
     CLASS_NAME_MAP: dict = {
-        "plain":    "Pot",
-        "Plain":    "Pot",
-        "pothole":  "Pot",
-        "Pothole":  "Pot",
+        "plain":    "Pothole",
+        "Plain":    "Pothole",
+        "pothole":  "Pothole",
+        "Pothole":  "Pothole",
+        "pot":      "Pothole",
+        "Pot":      "Pothole",
     }
 
     def __init__(

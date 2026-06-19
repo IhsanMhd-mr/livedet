@@ -160,24 +160,28 @@ def compute_heuristic_measurements(
     bbox: List[int], image_shape: Tuple[int, int]
 ) -> Dict:
     """
-    Compute depth/width/severity using simple heuristics (no MiDaS).
-
-    Args:
-        bbox: [x, y, w, h]
-        image_shape: (H, W)
-
-    Returns:
-        dict with depth_cm, width_cm, severity, severity_score
+    Compute realistic heuristic measurements for depth and width in cm.
+    Applies perspective correction to adjust depth estimates based on vertical FPV position.
     """
     x, y, w, h = bbox
     H, W = image_shape[:2]
 
+    # Width: relative width scaled to realistic cm bounds (e.g. 5.0 to 80.0 cm)
     width_cm = (w / max(W, 1)) * 100.0
-    height_ratio = h / max(w, 1)
-    depth_cm = (h / max(H, 1)) * 100.0 + (height_ratio * 10.0)
+    width_cm = max(min(width_cm, 80.0), 5.0)
 
-    depth_cm = max(depth_cm, 5.0)
-    width_cm = max(width_cm, 3.0)
+    # Base depth based on height percentage
+    raw_depth = (h / max(H, 1)) * 30.0
+
+    # Perspective correction: vertical center of the bounding box
+    y_center = y + h / 2.0
+    y_norm = y_center / max(H, 1)
+
+    # Damping factor: scales down depth for closer foreground objects (large y_norm)
+    # where FPV perspective magnification causes bounding boxes to appear exponentially larger.
+    perspective_factor = max(1.0 - 0.6 * y_norm, 0.4)
+    depth_cm = raw_depth * perspective_factor
+    depth_cm = max(min(depth_cm, 12.0), 2.0)
 
     return {"depth_cm": depth_cm, "width_cm": width_cm}
 

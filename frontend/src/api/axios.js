@@ -4,6 +4,7 @@ import toast from 'react-hot-toast'
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_BASE_URL || 'http://localhost:8000',
   timeout: 60000,
+  withCredentials: false,  // Don't send cookies with requests to avoid header size issues
 })
 
 api.interceptors.response.use(
@@ -13,6 +14,8 @@ api.interceptors.response.use(
 
     if (error.response?.status === 413) {
       toast.error('File too large')
+    } else if (error.response?.status === 431) {
+      toast.error('Request headers too large — try uploading a smaller file')
     } else if (error.response?.status === 422) {
       toast.error('Invalid file format')
     } else if (error.response?.status >= 500) {

@@ -6,7 +6,7 @@ const BASE_DELAY = 1000
 const MAX_DELAY = 30000
 const MAX_RETRIES = 8
 
-export function useWebSocket(path = '/ws/live', autoConnect = false) {
+export function useWebSocket(path = '', autoConnect = false) {
   const wsRef = useRef(null)
   const retryCount = useRef(0)
   const retryTimer = useRef(null)
@@ -16,6 +16,7 @@ export function useWebSocket(path = '/ws/live', autoConnect = false) {
   const [currentFrame, setCurrentFrame] = useState(null)
   const [detections, setDetections] = useState([])
   const [fps, setFps] = useState(0)
+  const [depthActive, setDepthActive] = useState(false)
   const fpsFrameCount = useRef(0)
   const fpsLastTs = useRef(Date.now())
 
@@ -61,8 +62,11 @@ export function useWebSocket(path = '/ws/live', autoConnect = false) {
           fpsFrameCount.current = 0
           fpsLastTs.current = now
         }
+      } else if (data.fps !== undefined) {
+        setFps(data.fps)
       }
       if (data.detections) setDetections(data.detections)
+      if (data.depth_active !== undefined) setDepthActive(data.depth_active)
     })
 
     ws.on('error', () => setWsStatus('error'))
@@ -103,7 +107,11 @@ export function useWebSocket(path = '/ws/live', autoConnect = false) {
     return () => disconnect()
   }, [autoConnect, connect, disconnect])
 
-  return { connect, disconnect, wsStatus, wsError, currentFrame, detections, fps }
+  const send = useCallback((data) => {
+    wsRef.current?.send(data)
+  }, [])
+
+  return { connect, disconnect, wsStatus, wsError, currentFrame, detections, fps, depthActive, send }
 }
 
 export default useWebSocket

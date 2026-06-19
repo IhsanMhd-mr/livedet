@@ -6,7 +6,7 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "start:all": "concurrently \"vite\" \"cd .. && venv-gpu\\\\Scripts\\\\python backend\\\\app.py\" \"cd .. && venv-gpu\\\\Scripts\\\\python backend\\\\live_ws.py\""
+    "start:all": "concurrently \"vite\" \"cd .. && .venv\\\\Scripts\\\\python backend\\\\app.py\" \"cd .. && .venv\\\\Scripts\\\\python backend\\\\live_ws.py\""
   },
   "dependencies": {
     "react": "^18.3.1",
