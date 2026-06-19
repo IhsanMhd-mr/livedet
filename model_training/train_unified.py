@@ -384,7 +384,7 @@ def train_yolov10m_base(epochs, batch_size, device, patience):
             save=True,
             project=str(project_root / 'runs' / 'base_models'),
             name='pothole_detector_yolov10m',
-            workers=config.NUM_WORKERS,
+            workers=int(os.getenv('NUM_WORKERS', 2)),
             close_mosaic=5,
             plots=False,
         )
@@ -406,18 +406,18 @@ def train_yolov10m_base(epochs, batch_size, device, patience):
         return None
 
 
-def train_yolov11m_base(epochs, batch_size, device, patience, model_size='m'):
-    """Train YOLOv11 model from scratch (Base Training)
+def train_yolo11_base(epochs, batch_size, device, patience, model_size='m'):
+    """Train YOLO11 model from scratch (Base Training)
     
     This is for initial model training from pretrained weights.
     For fine-tuning on annotated data, use fine_tune.py instead.
     """
     logger.info("")
     logger.info("=" * 80)
-    logger.info(f"BASE TRAINING: YOLOv11{model_size} (From Scratch)")
+    logger.info(f"BASE TRAINING: YOLO11{model_size} (From Scratch)")
     logger.info("=" * 80)
     logger.info(f"Configuration:")
-    logger.info(f"  Model: YOLOv11{model_size}")
+    logger.info(f"  Model: YOLO11{model_size}")
     logger.info(f"  Epochs: {epochs}")
     logger.info(f"  Batch size: {batch_size}")
     logger.info(f"  Device: {device}")
@@ -425,7 +425,7 @@ def train_yolov11m_base(epochs, batch_size, device, patience, model_size='m'):
     logger.info(f"  Dataset: {data_yaml}")
     logger.info("")
     
-    model_name = f'yolov11{model_size}'
+    model_name = f'yolo11{model_size}'
     logger.info(f"Loading {model_name} model...")
     model = YOLO(f'{model_name}.pt')
     logger.info("✓ Model loaded")
@@ -442,18 +442,18 @@ def train_yolov11m_base(epochs, batch_size, device, patience, model_size='m'):
             patience=patience,
             save=True,
             project=str(project_root / 'runs' / 'base_models'),
-            name=f'pothole_detector_yolov11{model_size}',
-            workers=config.NUM_WORKERS,
+            name=f'pothole_detector_yolo11{model_size}',
+            workers=int(os.getenv('NUM_WORKERS', 2)),
             close_mosaic=5,
             plots=False,
         )
         
         logger.info("")
         logger.info("=" * 80)
-        logger.info(f"✓ YOLOv11{model_size} BASE TRAINING COMPLETE")
+        logger.info(f"✓ YOLO11{model_size} BASE TRAINING COMPLETE")
         logger.info("="*80)
-        logger.info(f"Results: runs/base_models/pothole_detector_yolov11{model_size}/")
-        logger.info(f"Best model: runs/base_models/pothole_detector_yolov11{model_size}/weights/best.pt")
+        logger.info(f"Results: runs/base_models/pothole_detector_yolo11{model_size}/")
+        logger.info(f"Best model: runs/base_models/pothole_detector_yolo11{model_size}/weights/best.pt")
         logger.info(f"\nNext: Use fine_tune.py to fine-tune on annotated dataset")
         
         return results
@@ -489,7 +489,8 @@ NOTE: For fine-tuning on annotated data, use: python fine_tune.py
         '--model',
         type=str,
         default='yolov10m',
-        choices=['yolov10m', 'yolov11n', 'yolov11s', 'yolov11m', 'yolov11l', 'yolov11x'],
+        choices=['yolov10m', 'yolov11n', 'yolov11s', 'yolov11m', 'yolov11l', 'yolov11x',
+                 'yolo11n', 'yolo11s', 'yolo11m', 'yolo11l', 'yolo11x'],
         help='Model to train (default: yolov10m)'
     )
     
@@ -576,9 +577,9 @@ def main():
     # Train model from scratch
     if args.model == 'yolov10m':
         train_yolov10m_base(args.epochs, args.batch_size, args.device, args.patience)
-    elif args.model.startswith('yolov11'):
-        model_size = args.model.replace('yolov11', '')
-        train_yolov11m_base(args.epochs, args.batch_size, args.device, args.patience, model_size)
+    elif args.model.startswith('yolov11') or args.model.startswith('yolo11'):
+        model_size = args.model.replace('yolov11', '').replace('yolo11', '')
+        train_yolo11_base(args.epochs, args.batch_size, args.device, args.patience, model_size)
     
     logger.info("")
     logger.info("=" * 80)

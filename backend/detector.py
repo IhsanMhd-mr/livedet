@@ -47,7 +47,7 @@ class ObjectDetector:
     def __init__(
         self,
         model_path: Optional[str] = None,
-        model_type: str = "yolov8s",
+        model_type: str = "yolov11s",
         device: str = "cpu",
         confidence_threshold: float = 0.5,
     ):
@@ -56,7 +56,7 @@ class ObjectDetector:
 
         Args:
             model_path: Path to custom-trained .pt file (primary).
-            model_type: YOLO variant for fallback (e.g. 'yolov8s').
+            model_type: YOLO variant for fallback (e.g. 'yolov11s').
             device: 'cpu' or 'cuda' or 'cuda:0'.
             confidence_threshold: Default confidence threshold.
         """

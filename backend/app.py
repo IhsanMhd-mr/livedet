@@ -1,6 +1,6 @@
 """
 LIVEDET — Flask Backend API
-Road Defect Detection with YOLOv8s (Finetuned)
+Road Defect Detection with YOLOv11s (Finetuned)
 """
 
 import sys
