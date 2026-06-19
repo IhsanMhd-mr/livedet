@@ -118,6 +118,9 @@ backend/image_storage/processed/
 # Docs
 docs/
 
+#backups
+backups/
+
 # Data (optional - uncomment if storing large datasets locally)
 # dataset/
 # *.zip
