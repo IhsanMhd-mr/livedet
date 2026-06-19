@@ -94,10 +94,11 @@ export default function LiveDetection() {
 
             ctx.fillStyle = color + '12'; ctx.fillRect(bx, by, bw, bh)
 
-            const cls   = d.class_name || 'Defect'
-            const conf  = Math.round(d.confidence * 100)
+            const cls = d.class_name || 'Defect'
+            const severityScore = d.severity_score !== undefined ? d.severity_score : (d.confidence ?? 0)
+            const severityPercent = Math.round(severityScore * 100)
             const lines = [
-              `${cls} | ${d.severity} ${conf}%`,
+              `${cls} | ${d.severity} ${severityPercent}%`,
               `D: ${d.depth_cm?.toFixed(1) ?? '—'}cm  W: ${d.width_cm?.toFixed(1) ?? '—'}cm`,
             ]
             ctx.font = 'bold 12px "Outfit","Inter","Segoe UI",sans-serif'

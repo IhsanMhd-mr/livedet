@@ -140,16 +140,27 @@ def classify_severity(
     depth_cm: float, width_cm: float, confidence: float
 ) -> Tuple[str, float]:
     """
-    Severity = 50% depth + 30% width + 20% confidence.
-    Returns (label, score).
+    Calculate continuous severity score and classify into Low, Medium, High.
+    Heuristic rule:
+      High: width > 50 cm or depth > 8 cm
+      Medium: width >= 20 cm or depth >= 3 cm
+      Low: otherwise
     """
     d_norm = min(depth_cm / 15.0, 1.0)
     w_norm = min(width_cm / 100.0, 1.0)
     score = d_norm * 0.50 + w_norm * 0.30 + confidence * 0.20
-    for label, (lo, hi) in SEVERITY_LEVELS.items():
-        if lo <= score < hi:
-            return label, score
-    return "Critical", score
+    score = min(max(score, 0.0), 1.0)
+    
+    if score > 0.65:
+        label = "Critical"
+    elif width_cm > 50 or depth_cm > 8:
+        label = "High"
+    elif width_cm >= 20 or depth_cm >= 3:
+        label = "Medium"
+    else:
+        label = "Low"
+        
+    return label, score
 
 
 # ═══════════════════════════════════════════════════════════════════════════

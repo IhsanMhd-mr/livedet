@@ -85,14 +85,15 @@ def annotate_detections(image: np.ndarray, detections: list) -> np.ndarray:
         severity  = det.get("severity", "Low")
         cls_name  = det.get("class_name", "object")
         conf      = det.get("confidence", 0.0)
+        severity_score = det.get("severity_score", 0.0)
 
         color = SEVERITY_COLORS_BGR.get(severity, (0, 255, 0))
 
         # Bounding box
         cv2.rectangle(out, (x, y), (x + w, y + h), color, box_thickness)
 
-        # Label: "#1 Pothole | Severity conf%"
-        label = f"#{det_id} {cls_name} | {severity} {conf:.0%}"
+        # Label: "#1 Pothole | Severity severity_score%"
+        label = f"#{det_id} {cls_name} | {severity} {severity_score:.0%}"
         # Sub-label: depth / width / height
         sub = f"D:{det.get('depth_cm', 0):.1f}cm  W:{det.get('width_cm', 0):.1f}cm  H:{det.get('height_cm', 0):.1f}cm"
 

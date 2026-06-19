@@ -2,12 +2,12 @@ import { motion } from 'framer-motion'
 
 export function DetectionCard({ detection, index = 0, mode }) {
   const isImageMode = mode === 'image'
-  const confidence = detection.confidence ?? 0
-  const confPercent = Math.round(confidence * 100)
+  const severityScore = detection.severity_score !== undefined ? detection.severity_score : (detection.confidence ?? 0)
+  const severityPercent = Math.round(severityScore * 100)
   
   const severity = detection.severity || 'Low'
-  // Bar width represents confidence percentage
-  const barWidth = confPercent
+  // Bar width represents severity percentage
+  const barWidth = severityPercent
 
   const severityColors = {
     Low:      'from-accent-500 to-accent-400',
@@ -47,7 +47,7 @@ export function DetectionCard({ detection, index = 0, mode }) {
             {severity}
           </span>
           <span className="text-xs font-mono font-bold text-slate-300">
-            {confPercent}%
+            {severityPercent}%
           </span>
         </div>
       </div>

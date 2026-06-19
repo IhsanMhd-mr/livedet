@@ -383,7 +383,7 @@ export default function ImageDetect() {
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.9rem', backgroundColor: '#f9f9f9' }}>
                     <thead>
                       <tr style={{ backgroundColor: '#2c3e50', color: 'white', borderBottom: '2px solid #ddd' }}>
-                        {['#', 'Class', 'Confidence', 'Severity', 'Depth (cm)', 'Width (cm)', 'Area (px²)'].map(h => (
+                        {['#', 'Class', 'Severity %', 'Severity', 'Depth (cm)', 'Width (cm)', 'Area (px²)'].map(h => (
                           <th key={h} style={{ padding: '0.65rem 0.75rem', textAlign: 'left', whiteSpace: 'nowrap' }}>{h}</th>
                         ))}
                       </tr>
@@ -398,7 +398,9 @@ export default function ImageDetect() {
                           <tr key={idx} style={{ borderBottom: '1px solid #eee', backgroundColor: idx % 2 === 0 ? '#fff' : '#f5f5f5' }}>
                             <td style={{ padding: '0.65rem 0.75rem', fontWeight: 'bold' }}>#{det.id || idx + 1}</td>
                             <td style={{ padding: '0.65rem 0.75rem', color: '#1565c0', fontWeight: 600 }}>{det.class_name || '—'}</td>
-                            <td style={{ padding: '0.65rem 0.75rem' }}>{(det.confidence * 100).toFixed(1)}%</td>
+                            <td style={{ padding: '0.65rem 0.75rem' }}>
+                              {Math.round((det.severity_score !== undefined ? det.severity_score : (det.confidence ?? 0)) * 100)}%
+                            </td>
                             <td style={{ padding: '0.65rem 0.75rem' }}>
                               <span style={{
                                 padding: '0.2rem 0.6rem', borderRadius: '4px', fontWeight: 'bold',

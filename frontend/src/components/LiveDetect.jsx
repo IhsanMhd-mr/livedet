@@ -188,8 +188,10 @@ export default function LiveDetect() {
 
         // label
         const cls = d.class_name || 'Defect'
+        const severityScore = d.severity_score !== undefined ? d.severity_score : (d.confidence ?? 0)
+        const severityPercent = Math.round(severityScore * 100)
         const lines = [
-          `${cls}  ${d.severity}  ${(d.confidence * 100).toFixed(0)}%`,
+          `${cls}  ${d.severity}  ${severityPercent}%`,
           `D: ${d.depth_cm} cm   W: ${d.width_cm} cm`,
         ]
         ctx.font = 'bold 12px "Segoe UI", monospace'
@@ -345,7 +347,7 @@ export default function LiveDetect() {
             <table style={S.table}>
               <thead>
                 <tr>
-                  {['#', 'Class', 'Severity', 'Depth', 'Width', 'Conf'].map(h => (
+                  {['#', 'Class', 'Severity', 'Depth', 'Width', 'Severity %'].map(h => (
                     <th key={h} style={S.th}>{h}</th>
                   ))}
                 </tr>
@@ -358,9 +360,9 @@ export default function LiveDetect() {
                     <td style={{ ...S.td, color: SEVERITY_COLORS[d.severity], fontWeight: 700 }}>
                       {d.severity}
                     </td>
-                    <td style={S.td}>{d.depth_cm} cm</td>
-                    <td style={S.td}>{d.width_cm} cm</td>
-                    <td style={S.td}>{(d.confidence * 100).toFixed(0)}%</td>
+                    <td style={S.td}>{(d.depth_cm) || '—'} cm</td>
+                    <td style={S.td}>{(d.width_cm) || '—'} cm</td>
+                    <td style={S.td}>{Math.round((d.severity_score !== undefined ? d.severity_score : (d.confidence ?? 0)) * 100)}%</td>
                   </tr>
                 ))}
               </tbody>

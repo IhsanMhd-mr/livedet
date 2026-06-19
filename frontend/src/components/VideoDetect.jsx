@@ -214,11 +214,14 @@ export default function VideoDetect() {
                     Frame {result.frame}: {result.detections.length} detection(s)
                     {result.detections.length > 0 && (
                       <div style={{ marginLeft: '1rem', fontSize: '0.85rem', color: '#666' }}>
-                        {result.detections.map((det, i) => (
-                          <div key={i}>
-                            • Confidence: {(det.confidence * 100).toFixed(1)}%
-                          </div>
-                        ))}
+                        {result.detections.map((det, i) => {
+                          const severityScore = det.severity_score !== undefined ? det.severity_score : (det.confidence ?? 0)
+                          return (
+                            <div key={i}>
+                              • Severity: {(severityScore * 100).toFixed(1)}%
+                            </div>
+                          )
+                        })}
                       </div>
                     )}
                   </div>
