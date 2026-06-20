@@ -1,4 +1,4 @@
-import { useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import useWebSocket from '@/hooks/useWebSocket'
 import StatusBadge from '@/components/ui/StatusBadge'
@@ -12,11 +12,49 @@ const SEVERITY_COLORS = {
   Critical: '#ef4444',
 }
 
+const VEHICLE_PRESETS = [
+  {
+    id: 'sedan',
+    name: 'Sedan (Default)',
+    icon: '🚗',
+    dimensions: 'H: 1.2m · A: 45° · F: 600px',
+    desc: 'Standard passenger car mount height and tilt angle.',
+    active: true,
+  },
+  {
+    id: 'suv',
+    name: 'SUV / Crossover',
+    icon: '🚙',
+    dimensions: 'H: 1.5m · A: 40° · F: 600px',
+    desc: 'Mid-size utility vehicle mounting configuration.',
+    active: false,
+  },
+  {
+    id: 'van',
+    name: 'Delivery Van',
+    icon: '🚐',
+    dimensions: 'H: 2.0m · A: 35° · F: 600px',
+    desc: 'Commercial delivery van mounting parameters.',
+    active: false,
+  },
+  {
+    id: 'truck',
+    name: 'Heavy Truck',
+    icon: '🚛',
+    dimensions: 'H: 2.8m · A: 30° · F: 600px',
+    desc: 'Heavy transport vehicle front-cab mounting config.',
+    active: false,
+  }
+]
+
 export default function LiveDetection() {
   const { connect, disconnect, wsStatus, currentFrame, detections, fps, depthActive, send } = useWebSocket('', false)
 
   const isConnected = wsStatus === 'connected'
   const isConnecting = wsStatus === 'connecting'
+
+  const [selectedPreset, setSelectedPreset] = useState('sedan')
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false)
 
   const videoRef        = useRef(null)
   const displayCanvasRef = useRef(null)
@@ -26,9 +64,22 @@ export default function LiveDetection() {
   const animFrameRef    = useRef(null)
   const detectionsRef   = useRef([])
   const wsConnectedRef  = useRef(false)
+  const dropdownRef      = useRef(null)
 
   useEffect(() => { detectionsRef.current = detections }, [detections])
   useEffect(() => { wsConnectedRef.current = isConnected }, [isConnected])
+
+  useEffect(() => {
+    function handleClickOutside(event) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target)) {
+        setIsDropdownOpen(false)
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside)
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside)
+    }
+  }, [dropdownRef])
 
   // ── Camera ──────────────────────────────────────────────────────────────
   const startCamera = async () => {
@@ -171,6 +222,8 @@ export default function LiveDetection() {
     }
   }
 
+  const activePresetObj = VEHICLE_PRESETS.find(p => p.id === selectedPreset) || VEHICLE_PRESETS[0]
+
   return (
     <div className="mx-auto max-w-6xl">
       {/* Header */}
@@ -194,6 +247,97 @@ export default function LiveDetection() {
 
         <div className="flex items-center gap-3">
           <StatusBadge status={wsStatus} />
+
+          {/* Vehicle calibration preset dropdown */}
+          <div className="relative" ref={dropdownRef}>
+            <button
+              type="button"
+              disabled={isConnected || isConnecting}
+              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              className={`flex items-center gap-2 rounded-xl border border-white/5 bg-surface-800/40 backdrop-blur-md px-4 py-2.5 text-xs font-semibold text-white transition-all hover:bg-surface-800/60 focus:outline-none focus:ring-1 focus:ring-brand-500/50 ${
+                (isConnected || isConnecting) ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'
+              }`}
+            >
+              <span>{activePresetObj.name}</span>
+              <svg
+                className={`h-3 w-3 text-slate-400 transition-transform duration-200 ${isDropdownOpen ? 'rotate-180' : ''}`}
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+
+            <AnimatePresence>
+              {isDropdownOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                  transition={{ duration: 0.15 }}
+                  className="absolute right-0 mt-2 w-56 origin-top-right rounded-2xl border border-white/10 bg-surface-900/95 backdrop-blur-xl p-2 shadow-2xl z-[100]"
+                >
+                  <div className="px-3 py-1.5 border-b border-white/5 mb-1.5">
+                    <p className="text-[9px] font-bold uppercase tracking-wider text-slate-400 font-sans">Select Vehicle Preset</p>
+                  </div>
+                  <div className="space-y-1">
+                    {VEHICLE_PRESETS.map((preset) => {
+                      const isSelected = preset.id === selectedPreset
+                      
+                      if (preset.active) {
+                        return (
+                          <button
+                            key={preset.id}
+                            type="button"
+                            onClick={() => {
+                              setSelectedPreset(preset.id)
+                              setIsDropdownOpen(false)
+                            }}
+                            className={`w-full flex items-center justify-between rounded-xl p-2 text-left transition-colors border ${
+                              isSelected 
+                                ? 'bg-brand-500/20 text-white border-brand-500/30' 
+                                : 'hover:bg-white/5 text-slate-300 border-transparent'
+                            }`}
+                          >
+                            <div>
+                              <p className="font-semibold text-xs text-white leading-tight">{preset.name}</p>
+                              <p className="text-[9px] text-slate-400 mt-0.5 font-mono">{preset.dimensions}</p>
+                            </div>
+                            {isSelected && (
+                              <span className="h-1.5 w-1.5 rounded-full bg-brand-400 mr-1" />
+                            )}
+                          </button>
+                        )
+                      } else {
+                        return (
+                          <div
+                            key={preset.id}
+                            className="group relative w-full flex items-center justify-between rounded-xl p-2 text-left border border-transparent opacity-40 cursor-not-allowed bg-white/[0.01]"
+                          >
+                            <div>
+                              <p className="font-semibold text-xs text-slate-300 leading-tight">{preset.name}</p>
+                              <p className="text-[9px] text-slate-500 mt-0.5 font-mono">{preset.dimensions}</p>
+                            </div>
+                            <span className="text-[10px] mr-1">🔒</span>
+                            
+                            {/* Hover tooltip for future scope */}
+                            <div className="absolute hidden group-hover:flex flex-col items-center pointer-events-none z-[110] right-full top-1/2 -translate-y-1/2 mr-3 w-48">
+                              <div className="bg-slate-950/95 border border-white/10 text-white text-[11px] rounded-xl p-2.5 shadow-2xl backdrop-blur-md text-center">
+                                <p className="font-bold text-[9px] text-amber-400 uppercase tracking-wider mb-0.5">🔒 Future Scope</p>
+                                <p className="text-slate-400 leading-normal text-[10px]">This mounting preset is under future development and will be configurable soon.</p>
+                              </div>
+                            </div>
+                          </div>
+                        )
+                      }
+                    })}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
           {isConnected || isConnecting ? (
             <button
               onClick={() => { stopCamera(); disconnect() }}
