@@ -118,6 +118,13 @@ backend/image_storage/processed/
 # Docs
 docs/
 
+#Reports
+report/
+
+#comparison
+model_comparison_results/
+report_assets/
+
 #backups
 backups/
 
