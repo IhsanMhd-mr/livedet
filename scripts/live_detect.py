@@ -32,8 +32,8 @@ import numpy as np
 import torch
 
 # ── Ensure backend/ is on the path ──────────────────────────────────────────
-BACKEND_DIR = Path(__file__).resolve().parent
-PROJECT_ROOT = BACKEND_DIR.parent
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+BACKEND_DIR = PROJECT_ROOT / 'backend'
 sys.path.insert(0, str(BACKEND_DIR))
 sys.path.insert(0, str(PROJECT_ROOT))
 
