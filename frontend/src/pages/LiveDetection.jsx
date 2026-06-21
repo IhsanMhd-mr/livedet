@@ -56,6 +56,11 @@ export default function LiveDetection() {
   const [selectedPreset, setSelectedPreset] = useState('sedan')
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
 
+  // Driver Alert States
+  const [audioAlertEnabled, setAudioAlertEnabled] = useState(false)
+  const [proximityThreshold, setProximityThreshold] = useState(3.0)
+  const [isAlertActive, setIsAlertActive] = useState(false)
+
   const videoRef        = useRef(null)
   const displayCanvasRef = useRef(null)
   const captureCanvasRef = useRef(null)
@@ -66,8 +71,71 @@ export default function LiveDetection() {
   const wsConnectedRef  = useRef(false)
   const dropdownRef      = useRef(null)
 
+  // Refs for access in animation frame loop without stale closures
+  const audioAlertEnabledRef = useRef(audioAlertEnabled)
+  const proximityThresholdRef = useRef(proximityThreshold)
+  const lastBeepTimeRef = useRef(0)
+
   useEffect(() => { detectionsRef.current = detections }, [detections])
   useEffect(() => { wsConnectedRef.current = isConnected }, [isConnected])
+  useEffect(() => { audioAlertEnabledRef.current = audioAlertEnabled }, [audioAlertEnabled])
+  useEffect(() => { proximityThresholdRef.current = proximityThreshold }, [proximityThreshold])
+
+  // Web Audio API driver alarm sound synthesis
+  const playWarningSound = useCallback(() => {
+    try {
+      const AudioContext = window.AudioContext || window.webkitAudioContext
+      if (!AudioContext) return
+      const ctx = new AudioContext()
+      const now = ctx.currentTime
+      
+      const playTone = (time, freq, dur) => {
+        const osc = ctx.createOscillator()
+        const gain = ctx.createGain()
+        osc.type = 'sine'
+        osc.frequency.setValueAtTime(freq, time)
+        
+        gain.gain.setValueAtTime(0, time)
+        gain.gain.linearRampToValueAtTime(0.3, time + 0.02)
+        gain.gain.exponentialRampToValueAtTime(0.001, time + dur)
+        
+        osc.connect(gain)
+        gain.connect(ctx.destination)
+        osc.start(time)
+        osc.stop(time + dur)
+      }
+      
+      // Urgent, clean double-beep ADAS sound
+      playTone(now, 920, 0.12)
+      playTone(now + 0.18, 920, 0.15)
+    } catch (err) {
+      console.error('Audio synthesis failed:', err)
+    }
+  }, [])
+
+  // Check detections and trigger alerts when websocket receives new detections
+  useEffect(() => {
+    if (!isConnected) {
+      setIsAlertActive(false)
+      return
+    }
+
+    const hazardExists = detections.some(d => {
+      const isHighSeverity = d.severity === 'High' || d.severity === 'Critical'
+      const dist = d.distance_m ?? 5.0
+      return isHighSeverity && dist <= proximityThreshold
+    })
+
+    setIsAlertActive(hazardExists)
+
+    if (hazardExists && audioAlertEnabled) {
+      const nowMs = Date.now()
+      if (nowMs - lastBeepTimeRef.current > 1000) {
+        playWarningSound()
+        lastBeepTimeRef.current = nowMs
+      }
+    }
+  }, [detections, proximityThreshold, audioAlertEnabled, isConnected, playWarningSound])
 
   useEffect(() => {
     function handleClickOutside(event) {
@@ -129,12 +197,23 @@ export default function LiveDetection() {
           const ctx = canvas.getContext('2d')
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
 
+          const isBlinkOn = Math.floor(Date.now() / 250) % 2 === 0
+
+
           for (const d of detectionsRef.current) {
             if (!d.bbox) continue
             const [bx, by, bw, bh] = d.bbox
-            const color = SEVERITY_COLORS[d.severity] || '#10b981'
+            
+            const isHighSeverity = d.severity === 'High' || d.severity === 'Critical'
+            const dist = d.distance_m ?? 5.0
+            const isHazard = isHighSeverity && dist <= proximityThresholdRef.current
 
-            ctx.strokeStyle = color; ctx.lineWidth = 2
+            let color = SEVERITY_COLORS[d.severity] || '#10b981'
+            if (isHazard && isBlinkOn) {
+              color = '#ef4444' // Blink red
+            }
+
+            ctx.strokeStyle = color; ctx.lineWidth = isHazard ? 3 : 2
             ctx.strokeRect(bx, by, bw, bh)
 
             const cs = 8; ctx.fillStyle = color
@@ -143,14 +222,22 @@ export default function LiveDetection() {
             ctx.fillRect(bx - 1, by + bh - 1, cs, 2); ctx.fillRect(bx - 1, by + bh - cs + 1, 2, cs)
             ctx.fillRect(bx + bw - cs + 1, by + bh - 1, cs, 2); ctx.fillRect(bx + bw - 1, by + bh - cs + 1, 2, cs)
 
+            // Draw a second pulsing border for warning
+            if (isHazard) {
+              const pulseOffset = Math.abs(Math.sin(Date.now() / 150)) * 5
+              ctx.strokeStyle = 'rgba(239, 68, 68, 0.4)'
+              ctx.lineWidth = 1.5
+              ctx.strokeRect(bx - pulseOffset, by - pulseOffset, bw + pulseOffset * 2, bh + pulseOffset * 2)
+            }
+
             ctx.fillStyle = color + '12'; ctx.fillRect(bx, by, bw, bh)
 
             const cls = d.class_name || 'Defect'
             const severityScore = d.severity_score !== undefined ? d.severity_score : (d.confidence ?? 0)
             const severityPercent = Math.round(severityScore * 100)
             const lines = [
-              `${cls} | ${d.severity} ${severityPercent}%`,
-              `D: ${d.depth_cm?.toFixed(1) ?? '—'}cm  W: ${d.width_cm?.toFixed(1) ?? '—'}cm`,
+              `${isHazard ? '⚠️ CRITICAL RISK | ' : ''}${cls} | ${d.severity} ${severityPercent}%`,
+              `D: ${d.depth_cm?.toFixed(1) ?? '—'}cm  W: ${d.width_cm?.toFixed(1) ?? '—'}cm${d.distance_m !== undefined ? `  Dist: ${d.distance_m.toFixed(1)}m` : ''}`,
             ]
             ctx.font = 'bold 12px "Outfit","Inter","Segoe UI",sans-serif'
             ctx.textBaseline = 'top'
@@ -159,8 +246,10 @@ export default function LiveDetection() {
             const lblH = lh * lines.length + pad * 2
             const lblY = by - lblH - 2 > 0 ? by - lblH - 2 : by + bh + 2
 
-            ctx.fillStyle = 'rgba(15,23,42,0.85)'; ctx.fillRect(bx, lblY, lblW, lblH)
-            ctx.fillStyle = color;                 ctx.fillRect(bx, lblY, 3, lblH)
+            ctx.fillStyle = isHazard && isBlinkOn ? 'rgba(239, 68, 68, 0.95)' : 'rgba(15, 23, 42, 0.85)'
+            ctx.fillRect(bx, lblY, lblW, lblH)
+            ctx.fillStyle = isHazard && !isBlinkOn ? 'rgba(15, 23, 42, 0.85)' : color
+            ctx.fillRect(bx, lblY, 3, lblH)
             ctx.fillStyle = '#f8fafc'
             lines.forEach((line, i) => ctx.fillText(line, bx + pad + 4, lblY + pad + i * lh))
           }
@@ -406,6 +495,35 @@ export default function LiveDetection() {
                 </div>
               </div>
             )}
+
+            {/* Top Dashboard Warning Bar (Vehicle Hazard Blinkers) */}
+            <AnimatePresence>
+              {isAlertActive && (
+                <motion.div
+                  initial={{ opacity: 0, y: -20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -20 }}
+                  transition={{ type: "spring", stiffness: 300, damping: 25 }}
+                  className="absolute top-0 left-0 right-0 h-10 bg-[#7f1d1d]/90 backdrop-blur-md border-b border-danger-500/30 px-6 flex items-center justify-between text-xs z-50 select-none font-sans font-extrabold"
+                >
+                  {/* Left Blinker Arrow */}
+                  <div className="flex gap-1.5 text-danger-500 text-sm animate-pulse tracking-tighter">
+                    <span>◀</span><span>◀</span><span>◀</span>
+                  </div>
+
+                  {/* Warning center text */}
+                  <div className="flex items-center gap-2 text-red-200 tracking-widest uppercase text-[10px]">
+                    <span className="text-xs">⚠️</span>
+                    <span>HAZARD ALERT: POTHOLE CLOSE</span>
+                  </div>
+
+                  {/* Right Blinker Arrow */}
+                  <div className="flex gap-1.5 text-danger-500 text-sm animate-pulse tracking-tighter">
+                    <span>▶</span><span>▶</span><span>▶</span>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
 
           {/* Stats */}
@@ -424,15 +542,88 @@ export default function LiveDetection() {
         </div>
 
         {/* Detections sidebar */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-white">
-              Live Detections
-              {detections.length > 0 && (
-                <span className="ml-2 rounded-full bg-brand-500/20 px-2 py-0.5 text-xs text-brand-400">{detections.length}</span>
+        <div className="space-y-4">
+          {/* Driver Alert Settings Panel */}
+          <div className="rounded-2xl border border-white/5 bg-surface-800/40 backdrop-blur-md p-4 space-y-4">
+            <div className="flex items-center justify-between border-b border-white/5 pb-2">
+              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-300 font-sans flex items-center gap-1.5">
+                <span>🛡️</span> Driver Collision Alerts
+              </h3>
+              {isAlertActive && (
+                <span className="relative flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-danger-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-danger-500"></span>
+                </span>
               )}
-            </h2>
+            </div>
+            
+            <div className="space-y-4">
+              {/* Audio alert toggle switch */}
+              <div className="flex items-center justify-between">
+                <div>
+                  <label className="text-xs font-semibold text-white">Audio Warning Beeps</label>
+                  <p className="text-[10px] text-slate-400">ADAS alarm when pothole is near</p>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={playWarningSound}
+                    className="p-1.5 rounded-lg border border-white/10 bg-white/5 hover:bg-white/10 text-slate-300 transition-colors"
+                    title="Test warning sound"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" />
+                    </svg>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAudioAlertEnabled(!audioAlertEnabled)}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
+                      audioAlertEnabled ? 'bg-brand-500' : 'bg-slate-700'
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        audioAlertEnabled ? 'translate-x-6' : 'translate-x-1'
+                      }`}
+                    />
+                  </button>
+                </div>
+              </div>
+
+              {/* Proximity Threshold slider */}
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-semibold text-white">Alert Proximity Threshold</label>
+                  <span className="font-mono text-xs font-bold text-brand-400">{proximityThreshold.toFixed(1)}m</span>
+                </div>
+                <input
+                  type="range"
+                  min="1.5"
+                  max="4.5"
+                  step="0.1"
+                  value={proximityThreshold}
+                  onChange={(e) => setProximityThreshold(parseFloat(e.target.value))}
+                  className="w-full h-1.5 bg-slate-700 rounded-lg appearance-none cursor-pointer accent-brand-500"
+                />
+                <div className="flex justify-between text-[9px] text-slate-500 font-mono">
+                  <span>1.5m (Urgent)</span>
+                  <span>3.0m (Standard)</span>
+                  <span>4.5m (Early)</span>
+                </div>
+              </div>
+            </div>
           </div>
+
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h2 className="text-sm font-semibold text-white">
+                Live Detections
+                {detections.length > 0 && (
+                  <span className="ml-2 rounded-full bg-brand-500/20 px-2 py-0.5 text-xs text-brand-400">{detections.length}</span>
+                )}
+              </h2>
+            </div>
           <div className="max-h-[520px] space-y-2 overflow-y-auto pr-1">
             <AnimatePresence mode="popLayout">
               {detections.length > 0 ? (
@@ -454,6 +645,7 @@ export default function LiveDetection() {
                 </motion.div>
               )}
             </AnimatePresence>
+          </div>
           </div>
         </div>
       </div>

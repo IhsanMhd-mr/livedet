@@ -154,11 +154,16 @@ async def handle_client(websocket):
                         depth_cm = compute_depth_cm(med)
                         width_cm = compute_real_width(float(w), med, focal)
                         height_cm = compute_real_width(float(h), med, focal)
+                        distance_m = max(float(med) * 5.0, 0.3)
                     else:
                         # Heuristic fallback
                         width_cm = (w / max(fw, 1)) * 50.0
                         height_cm = (h / max(fh, 1)) * 50.0
                         depth_cm = (h / max(fh, 1)) * 15.0 + 2.0
+                        
+                        y_center = y + h / 2.0
+                        y_norm = y_center / max(fh, 1)
+                        distance_m = max(5.0 - (y_norm * 4.5), 0.5)
 
                     severity_label, severity_score = classify_severity(depth_cm, width_cm, conf)
 
@@ -170,6 +175,7 @@ async def handle_client(websocket):
                         "depth_cm": round(float(depth_cm), 1),
                         "width_cm": round(float(width_cm), 1),
                         "height_cm": round(float(height_cm), 1),
+                        "distance_m": round(float(distance_m), 2),
                         "severity": severity_label,
                         "severity_score": round(float(severity_score), 3),
                     })
