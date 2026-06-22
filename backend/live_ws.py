@@ -89,6 +89,7 @@ def initialize_models():
         model_path=cfg.BEST_MODEL_PATH,
         device=device,
         confidence_threshold=getattr(cfg, "CONFIDENCE_THRESHOLD", 0.25),
+        iou_threshold=getattr(cfg, "IOU_THRESHOLD", 0.45),
     )
     logger.info("YOLO ✓")
 

@@ -45,17 +45,18 @@ app.config['MAX_CONTENT_LENGTH'] = 50 * 1024 * 1024  # 50 MB for file uploads
 app.config['JSON_MAX_SIZE'] = 50 * 1024 * 1024       # 50 MB for JSON responses
 
 cfg = Config()
-detector: ObjectDetector = None
+detector = None
 
 try:
-    logger.info("[app] Loading ObjectDetector …")
+    logger.info("Loading ObjectDetector...")
     detector = ObjectDetector(
         model_path=cfg.BEST_MODEL_PATH,
         model_type=cfg.MODEL_TYPE,
         device=cfg.DEVICE,
         confidence_threshold=cfg.CONFIDENCE_THRESHOLD,
+        iou_threshold=cfg.IOU_THRESHOLD,
     )
-    logger.info(f"[app] ✓ Detector ready — {detector.loaded_model_name}")
+    logger.info(f"Detector ready - {detector.loaded_model_name}")
 except Exception as exc:
     logger.error(f"[app] Detector init failed: {exc}")
     detector = None
@@ -258,7 +259,7 @@ def predict():
     }
 
     logger.info(
-        f"[/predict] [{session_id}] ✓ {len(detections)} detection(s) | "
+        f"[/predict] [{session_id}] {len(detections)} detection(s) | "
         f"sev={sev_counts} | model={detector.loaded_model_name}"
     )
 
@@ -444,5 +445,5 @@ def server_error(e):
 
 
 if __name__ == "__main__":
-    logger.info(f"[app] Starting on http://{cfg.FLASK_HOST}:{cfg.FLASK_PORT}")
+    logger.info(f"Starting server on http://{cfg.FLASK_HOST}:{cfg.FLASK_PORT}")
     app.run(host=cfg.FLASK_HOST, port=cfg.FLASK_PORT, debug=False, threaded=True)

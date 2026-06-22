@@ -77,6 +77,7 @@ class Config:
         # Inference settings
         self.DEVICE = os.getenv('DEVICE', 'cpu')
         self.CONFIDENCE_THRESHOLD = float(os.getenv('CONFIDENCE_THRESHOLD', '0.5'))
+        self.IOU_THRESHOLD = float(os.getenv('IOU_THRESHOLD', '0.45'))
     
     def get(self, key: str, default=None):
         """Get configuration value by key"""
