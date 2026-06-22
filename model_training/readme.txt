@@ -10,8 +10,7 @@ Notebooks:
 - train.ipynb: Test notebook for checking environments, loading weights, and running single training test runs.
 
 Documentation:
-- TRAINING_WORKFLOW.md: Guide detailing Stage 1 (Base) and Stage 2 (Fine-tuning) training strategies.
-- FOLDER_STRUCTURE.md: Guide explaining model checkpoints directories inside the runs folder.
+- FOLDER_STRUCTURE.txt: Guide explaining model checkpoints directories inside the runs folder.
 
 Directories:
 - utils: Helper files containing dataset loaders (dataset_handler.py), physical dimension calculators (depth_estimator.py), and safety classification models (severity_calculator.py).

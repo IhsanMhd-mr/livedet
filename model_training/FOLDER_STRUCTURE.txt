@@ -1,0 +1,183 @@
+MODEL STORAGE STRUCTURE
+=======================
+
+Folder Organization in `runs/`
+--------------------------------------------------
+
+runs/
+├── basemodels/                    ← BASE TRAINING OUTPUT
+│   ├── potholedetectoryolov10m/
+│   │   ├── weights/
+│   │   │   ├── best.pt             ← ✓ Use this for fine-tuning
+│   │   │   └── last.pt
+│   │   ├── results.csv
+│   │   └── ...
+│   │
+│   ├── potholedetectoryolov11m/
+│   │   ├── weights/
+│   │   │   ├── best.pt
+│   │   │   └── last.pt
+│   │   └── ...
+│   │
+│   └── potholedetectoryolov11l/
+│       ├── weights/
+│       │   ├── best.pt
+│       │   └── last.pt
+│       └── ...
+│
+└── finetunedmodels/               ← FINE-TUNING OUTPUT
+    ├── potholefinetunedannotated/
+    │   ├── weights/
+    │   │   ├── best.pt             ← ✓ Production model
+    │   │   └── last.pt
+    │   ├── results.csv
+    │   └── ...
+    │
+    ├── iterationv2/
+    │   ├── weights/
+    │   │   ├── best.pt
+    │   │   └── last.pt
+    │   └── ...
+    │
+    └── yolov11lfinetuned/
+        ├── weights/
+        │   ├── best.pt
+        │   └── last.pt
+        └── ...
+
+--------------------------------------------------
+
+Usage Pattern
+--------------------------------------------------
+
+=== Stage 1: Base Training ===
+
+python trainunified.py
+↓
+Saved to: runs/basemodels/potholedetectoryolov10m/weights/best.pt
+
+=== Stage 2: Fine-Tuning ===
+
+python finetune.py --checkpoint runs/basemodels/potholedetectoryolov10m/weights/best.pt
+↓
+Saved to: runs/finetunedmodels/potholefinetunedannotated/weights/best.pt
+
+=== Stage 3: Deployment ===
+
+UPDATE .ENV
+===========
+
+PREDICTINGMODELSPATH=runs/finetunedmodels/potholefinetunedannotated/weights/best.pt
+
+--------------------------------------------------
+
+Key Points
+--------------------------------------------------
+
+1. Base Models - Stored separately in `runs/basemodels/`
+   - Clean organization of initial models
+   - Easy to find checkpoints for fine-tuning
+   - Multiple base models can coexist
+
+2. Fine-Tuned Models - Stored separately in `runs/finetunedmodels/`
+   - Production-ready models
+   - Can iterate on fine-tuning without polluting base models
+   - Custom naming for different versions
+
+3. Model Selection
+   - Always use best.pt for inference
+   - Use last.pt for resuming interrupted training
+   - Keep basemodels for reference and comparison
+
+--------------------------------------------------
+
+Example Iteration Workflow
+--------------------------------------------------
+
+ITERATION 1: BASE TRAINING (YOLOV10M)
+=====================================
+
+python trainunified.py --epochs 100
+
+OUTPUT: RUNS/BASEMODELS/POTHOLEDETECTORYOLOV10M/WEIGHTS/BEST.PT
+==================================================================
+
+ITERATION 1: FINE-TUNING
+========================
+
+python finetune.py --checkpoint runs/basemodels/potholedetectoryolov10m/weights/best.pt \
+  --epochs 50 --name finetunedv1
+
+OUTPUT: RUNS/FINETUNEDMODELS/FINETUNEDV1/WEIGHTS/BEST.PT
+==========================================================
+
+ITERATION 2: FINE-TUNING WITH DIFFERENT SETTINGS
+================================================
+
+python finetune.py --checkpoint runs/basemodels/potholedetectoryolov10m/weights/best.pt \
+  --epochs 75 --batch-size 8 --name finetunedv2
+
+OUTPUT: RUNS/FINETUNEDMODELS/FINETUNEDV2/WEIGHTS/BEST.PT
+==========================================================
+
+ITERATION 3: TRY DIFFERENT BASE MODEL
+=====================================
+
+python trainunified.py --model yolov11m --epochs 120
+
+OUTPUT: RUNS/BASEMODELS/POTHOLEDETECTORYOLOV11M/WEIGHTS/BEST.PT
+==================================================================
+
+FINE-TUNE NEW BASE MODEL
+========================
+
+python finetune.py --checkpoint runs/basemodels/potholedetectoryolov11m/weights/best.pt \
+  --model yolov11m --epochs 50 --name yolov11mfinetuned
+
+OUTPUT: RUNS/FINETUNEDMODELS/YOLOV11MFINETUNED/WEIGHTS/BEST.PT
+================================================================
+
+COMPARE AND DEPLOY BEST MODEL
+=============================
+
+CHECK RESULTS AT: RUNS/FINETUNEDMODELS/FINETUNEDV2/RESULTS.CSV
+================================================================
+
+IF BEST, UPDATE .ENV TO USE: RUNS/FINETUNEDMODELS/FINETUNEDV2/WEIGHTS/BEST.PT
+===============================================================================
+
+--------------------------------------------------
+
+Cleanup Guidelines
+--------------------------------------------------
+
+=== Keep ===
+
+- ✓ Base model checkpoints (for re-finetuning)
+- ✓ Best fine-tuned models (for production)
+- ✓ Latest results.csv files (for comparison)
+
+=== Safe to Delete ===
+
+- ✗ Old fine-tuned iterations (if not needed for comparison)
+- ✗ last.pt files (after training completes successfully)
+- ✗ Previous base models (if new versions are better)
+
+EXAMPLE: CLEAN UP OLD FINE-TUNED VERSIONS (KEEPING LATEST)
+==========================================================
+
+rm -r runs/finetunedmodels/finetunedv1/
+rm -r runs/finetunedmodels/iteration/ # except latest
+
+--------------------------------------------------
+
+Quick Reference
+--------------------------------------------------
+
+| Task | Command | Output Location |
+|------|---------|-----------------|
+| Base training | `python trainunified.py` | `runs/basemodels/` |
+| Fine-tuning | `python finetune.py --checkpoint ...` | `runs/finetunedmodels/` |
+| Get model path | ls -la `runs/basemodels//weights/best.pt` | Model path |
+| Deploy model | Update .env `PREDICTINGMODELSPATH` | Production |
+| View results | cat `runs/finetunedmodels/*/results.csv` | Metrics |
