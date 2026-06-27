@@ -274,8 +274,9 @@ async def handle_client(websocket):
                         width_cm  = compute_real_width(float(w), med, focal)
                         height_cm = compute_real_width(float(h), med, focal)
 
-                        # Distance: scale normalised depth to metres
-                        distance_m = max(float(med) * 5.0, 0.3)
+                        # Distance: MiDaS outputs inverse depth (higher = closer).
+                        # Invert so that far objects get larger distance values.
+                        distance_m = max((1.0 - float(med)) * 5.0 + 0.3, 0.3)
 
                     else:
                         # ── Pure heuristic fallback ───────────────────────

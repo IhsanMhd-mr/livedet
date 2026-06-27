@@ -282,7 +282,7 @@ class StorageManager:
                 sessions_to_clear.append(session_id)
         
         for session_id in sessions_to_clear:
-            print(f"🧹 Auto-cleanup: Clearing session {session_id}")
+            print(f" Auto-cleanup: Clearing session {session_id}")
             cls.clear_session(session_id, delete_files=True)
     
     @classmethod
