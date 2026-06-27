@@ -121,6 +121,9 @@ docs/
 #Reports
 report/
 
+#Demo folder
+frontend/public/videos/
+
 #comparison
 model_comparison_results/
 report_assets/

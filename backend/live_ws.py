@@ -313,8 +313,6 @@ async def handle_client(websocket):
                         "distance_m":     round(float(distance_m),    2),
                         "severity":       severity_label,
                         "severity_score": round(float(severity_score),3),
-                        # Expose MiDaS confidence so the React client can
-                        # optionally show a depth-reliability indicator
                         "midas_confidence": round(float(midas_conf),  2),
                     })
 

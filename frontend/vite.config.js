@@ -22,7 +22,7 @@ export default defineConfig({
         target: 'http://localhost:8000',
         changeOrigin: true,
       },
-      '/video': {
+      '/video/process': {
         target: 'http://localhost:8000',
         changeOrigin: true,
       },

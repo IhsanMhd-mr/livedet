@@ -33,7 +33,7 @@ export default function Home() {
 
       {/* Options Grid */}
       <motion.div variants={container} initial="hidden" animate="show" className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <motion.div variants={item}>
+        <motion.div variants={item} className="h-full">
           <CardOption
             icon={(props) => (
               <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -47,7 +47,7 @@ export default function Home() {
           />
         </motion.div>
 
-        <motion.div variants={item}>
+        <motion.div variants={item} className="h-full">
           <CardOption
             icon={(props) => (
               <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -62,7 +62,7 @@ export default function Home() {
           />
         </motion.div>
 
-        <motion.div variants={item}>
+        <motion.div variants={item} className="h-full">
           <CardOption
             icon={(props) => (
               <svg {...props} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>

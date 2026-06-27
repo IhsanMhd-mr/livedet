@@ -6,6 +6,7 @@ import Home from '@/pages/Home'
 import ImageDetection from '@/pages/ImageDetection'
 import VideoDetection from '@/pages/VideoDetection'
 import LiveDetection from '@/pages/LiveDetection'
+import Demo from '@/pages/Demo'
 
 export default function App() {
   return (
@@ -17,6 +18,7 @@ export default function App() {
             <Route path="/image" element={<ImageDetection />} />
             <Route path="/video" element={<VideoDetection />} />
             <Route path="/live"  element={<LiveDetection />} />
+            <Route path="/demo"  element={<Demo />} />
           </Route>
         </Routes>
       </BrowserRouter>
