@@ -48,13 +48,80 @@ const VEHICLE_PRESETS = [
 ]
 
 export default function LiveDetection() {
-  const { connect, disconnect, wsStatus, currentFrame, detections, fps, depthActive, send } = useWebSocket('', false)
+  const {
+    connect,
+    disconnect,
+    wsStatus,
+    currentFrame,
+    detections,
+    fps,
+    depthActive,
+    send,
+    reconnectAttempt,
+    maxReconnectAttempts,
+    currentReconnectDelay,
+    isReconnecting,
+    hasConnectedBefore,
+    hasReconnectExhausted
+  } = useWebSocket('', false)
 
   const isConnected = wsStatus === 'connected'
   const isConnecting = wsStatus === 'connecting'
 
   const [selectedPreset, setSelectedPreset] = useState('sedan')
   const [isDropdownOpen, setIsDropdownOpen] = useState(false)
+  const [isCameraActive, setIsCameraActive] = useState(false)
+
+  // Derive refined WebSocket/Camera UI State
+  let uiState = 'idle'
+  if (isCameraActive) {
+    if (isConnected) {
+      uiState = 'connected'
+    } else if (isReconnecting) {
+      uiState = 'reconnecting'
+    } else if (wsStatus === 'connecting') {
+      uiState = 'connecting'
+    } else if (wsStatus === 'error') {
+      uiState = 'error'
+    } else {
+      uiState = 'connecting' // fallback
+    }
+  } else if (wsStatus === 'error') {
+    uiState = 'error'
+  }
+
+  // Derive indicator status, label, and dynamic status description text
+  let uiStatus = 'disconnected'
+  let uiStatusLabel = 'Stopped'
+  let uiDescription = 'Press Start Camera to begin live feed'
+  let uiButtonText = 'Start Camera'
+
+  if (uiState === 'idle') {
+    uiStatus = 'disconnected'
+    uiStatusLabel = 'Stopped'
+    uiDescription = 'Press Start Camera to begin live feed'
+    uiButtonText = 'Start Camera'
+  } else if (uiState === 'connecting') {
+    uiStatus = 'connecting'
+    uiStatusLabel = 'Connecting'
+    uiDescription = 'Connecting to detection server...'
+    uiButtonText = 'Connecting...'
+  } else if (uiState === 'connected') {
+    uiStatus = 'connected'
+    uiStatusLabel = 'Connected'
+    uiDescription = 'Connected to detection server'
+    uiButtonText = 'Stop Camera'
+  } else if (uiState === 'reconnecting') {
+    uiStatus = 'reconnecting'
+    uiStatusLabel = `Reconnecting attempt ${reconnectAttempt} of ${maxReconnectAttempts}`
+    uiDescription = `Reconnecting to detection server... Attempt ${reconnectAttempt} of ${maxReconnectAttempts}`
+    uiButtonText = 'Stop Reconnecting'
+  } else if (uiState === 'error') {
+    uiStatus = 'error'
+    uiStatusLabel = 'Server unavailable'
+    uiDescription = 'Detection server unavailable after reconnect attempts. Please check that the backend is running and try again.'
+    uiButtonText = 'Retry Connection'
+  }
 
   // Driver Alert States
   const [audioAlertEnabled, setAudioAlertEnabled] = useState(false)
@@ -75,6 +142,54 @@ export default function LiveDetection() {
   const audioAlertEnabledRef = useRef(audioAlertEnabled)
   const proximityThresholdRef = useRef(proximityThreshold)
   const lastBeepTimeRef = useRef(0)
+
+  // Refs for tracking state transitions
+  const prevWsStatusRef = useRef(null)
+  const prevIsReconnectingRef = useRef(false)
+  const prevReconnectAttemptRef = useRef(0)
+  const prevHasReconnectExhaustedRef = useRef(false)
+
+  useEffect(() => {
+    const prevWsStatus = prevWsStatusRef.current
+    const prevIsReconnecting = prevIsReconnectingRef.current
+    const prevReconnectAttempt = prevReconnectAttemptRef.current
+    const prevHasReconnectExhausted = prevHasReconnectExhaustedRef.current
+
+    // 1. Initial Connection Success
+    if (wsStatus === 'connected' && prevWsStatus !== 'connected' && !isReconnecting && !prevIsReconnecting) {
+      toast.success('WebSocket connected successfully', { id: 'ws-status' })
+      console.log('%c✅ WebSocket connected successfully', 'color: green; font-weight: bold;')
+    }
+
+    // 2. Reconnect Success
+    if (wsStatus === 'connected' && prevWsStatus !== 'connected' && prevIsReconnecting) {
+      toast.success('WebSocket reconnected successfully', { id: 'ws-status' })
+      console.log('%c✅ WebSocket reconnect successful', 'color: green; font-weight: bold;')
+    }
+
+    // 3. Reconnect Attempt
+    if (isReconnecting && reconnectAttempt > 0 && reconnectAttempt !== prevReconnectAttempt) {
+      const delayText = currentReconnectDelay ? ` in ${currentReconnectDelay}s` : ''
+      console.log(`%c⚠️ WebSocket reconnect attempt ${reconnectAttempt} of ${maxReconnectAttempts}${delayText}...`, 'color: orange; font-weight: bold;')
+    }
+
+    // 4. Final Failure
+    if (hasReconnectExhausted && !prevHasReconnectExhausted) {
+      toast.error('Detection server unavailable after reconnect attempts. Please check that the backend is running and try again.', { id: 'ws-status' })
+      console.log(`%c❌ WebSocket server unavailable after ${maxReconnectAttempts} reconnect attempts. Check backend server on port 8765.`, 'color: red; font-weight: bold;')
+    }
+
+    // 5. Initial Connection Failure (Optional)
+    if (wsStatus === 'error' && prevWsStatus !== 'error' && !hasConnectedBefore && !isReconnecting && !hasReconnectExhausted) {
+      toast.error('WebSocket connection failed', { id: 'ws-status' })
+    }
+
+    // Keep refs in sync
+    prevWsStatusRef.current = wsStatus
+    prevIsReconnectingRef.current = isReconnecting
+    prevReconnectAttemptRef.current = reconnectAttempt
+    prevHasReconnectExhaustedRef.current = hasReconnectExhausted
+  }, [wsStatus, isReconnecting, reconnectAttempt, maxReconnectAttempts, currentReconnectDelay, hasReconnectExhausted, hasConnectedBefore])
 
   useEffect(() => { detectionsRef.current = detections }, [detections])
   useEffect(() => { wsConnectedRef.current = isConnected }, [isConnected])
@@ -169,6 +284,7 @@ export default function LiveDetection() {
     cancelAnimationFrame(animFrameRef.current); animFrameRef.current = null
     streamRef.current?.getTracks().forEach((t) => t.stop()); streamRef.current = null
     if (videoRef.current) videoRef.current.srcObject = null
+    setIsCameraActive(false)
   }, [])
 
   useEffect(() => () => { stopCamera(); disconnect() }, [stopCamera, disconnect])
@@ -198,7 +314,6 @@ export default function LiveDetection() {
           ctx.drawImage(video, 0, 0, canvas.width, canvas.height)
 
           const isBlinkOn = Math.floor(Date.now() / 250) % 2 === 0
-
 
           for (const d of detectionsRef.current) {
             if (!d.bbox) continue
@@ -298,18 +413,40 @@ export default function LiveDetection() {
       const t = setTimeout(() => { beginSendLoop() }, 300)
       return () => clearTimeout(t)
     } else {
-      stopCamera()
+      // Clear send interval but keep camera open while retrying connection
+      clearInterval(frameIntervalRef.current)
+      frameIntervalRef.current = null
+      
+      // Stop camera only if we have hit complete error / stop state or exhausted retries
+      if (hasReconnectExhausted || wsStatus === 'error') {
+        stopCamera()
+      }
     }
-  }, [isConnected, stopCamera])
+  }, [isConnected, wsStatus, hasReconnectExhausted, stopCamera])
 
   const handleStart = async () => {
     try {
       await startCamera()
       connect()
+      setIsCameraActive(true)
     } catch (err) {
       toast.error(`Camera error: ${err.message}`)
     }
   }
+
+  const handleStop = () => {
+    const wasConnected = isConnected
+    stopCamera()
+    disconnect()
+    if (wasConnected) {
+      console.log('%c🛑 Active WebSocket connection stopped by user', 'color: red; font-weight: bold;')
+      toast.success('Camera stopped', { id: 'ws-status' })
+    } else {
+      console.log('%c🛑 WebSocket reconnect manually stopped by user', 'color: gray; font-weight: bold;')
+      toast.success('Reconnect stopped', { id: 'ws-status' })
+    }
+  }
+
 
   const activePresetObj = VEHICLE_PRESETS.find(p => p.id === selectedPreset) || VEHICLE_PRESETS[0]
 
@@ -320,7 +457,7 @@ export default function LiveDetection() {
         <div>
           <h1 className="text-3xl font-bold">Live Detection</h1>
           <p className="mt-1 text-sm text-slate-400">
-            Real-time WebSocket AI inference stream
+            {uiDescription}
             {isConnected && (
               <span className={`ml-2.5 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium border ${
                 depthActive
@@ -335,7 +472,7 @@ export default function LiveDetection() {
         </div>
 
         <div className="flex items-center gap-3">
-          <StatusBadge status={wsStatus} />
+          <StatusBadge status={uiStatus} label={uiStatusLabel} />
 
           {/* Vehicle calibration preset dropdown */}
           <div className="relative" ref={dropdownRef}>
@@ -427,19 +564,28 @@ export default function LiveDetection() {
             </AnimatePresence>
           </div>
 
-          {isConnected || isConnecting ? (
+          {uiState === 'connected' && (
             <button
-              onClick={() => { stopCamera(); disconnect() }}
+              onClick={handleStop}
               className="rounded-xl border border-danger-500/40 bg-danger-500/10 px-5 py-2.5 text-sm font-semibold text-danger-400 transition-colors hover:bg-danger-500/20"
             >
-              Stop Camera
+              {uiButtonText}
             </button>
-          ) : (
+          )}
+          {(uiState === 'connecting' || uiState === 'reconnecting') && (
+            <button
+              onClick={handleStop}
+              className="rounded-xl border border-warning-500/40 bg-warning-500/10 px-5 py-2.5 text-sm font-semibold text-warning-400 transition-colors hover:bg-warning-500/20"
+            >
+              {uiButtonText}
+            </button>
+          )}
+          {(uiState === 'idle' || uiState === 'error') && (
             <button
               onClick={handleStart}
               className="rounded-xl bg-brand-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-brand-600"
             >
-              Start Camera
+              {uiButtonText}
             </button>
           )}
         </div>
@@ -475,8 +621,8 @@ export default function LiveDetection() {
                   <svg className="mb-3 h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
                     <path strokeLinecap="round" strokeLinejoin="round" d="M8.288 15.038a5.25 5.25 0 017.424 0M5.106 11.856c3.807-3.808 9.98-3.808 13.788 0M1.924 8.674c5.565-5.565 14.587-5.565 20.152 0M12.53 18.22l-.53.53-.53-.53a.75.75 0 011.06 0z" />
                   </svg>
-                  <p className="text-sm">
-                    {wsStatus === 'error' ? 'Connection error — retry' : 'Press Start Camera to begin live feed'}
+                  <p className="text-sm px-6 text-center leading-relaxed">
+                    {uiDescription}
                   </p>
                 </motion.div>
               )}
@@ -529,7 +675,7 @@ export default function LiveDetection() {
           {/* Stats */}
           <div className="grid grid-cols-3 gap-3">
             {[
-              { label: 'Status',     value: wsStatus.charAt(0).toUpperCase() + wsStatus.slice(1) },
+              { label: 'Status',     value: uiStatusLabel },
               { label: 'FPS',        value: isConnected ? fps : '—' },
               { label: 'Detections', value: detections.length },
             ].map(({ label, value }) => (

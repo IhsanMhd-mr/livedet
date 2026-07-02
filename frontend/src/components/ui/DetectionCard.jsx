@@ -1,6 +1,7 @@
+import React from 'react'
 import { motion } from 'framer-motion'
 
-export function DetectionCard({ detection, index = 0, mode }) {
+export const DetectionCard = React.forwardRef(({ detection, index = 0, mode }, ref) => {
   const isImageMode = mode === 'image'
   const severityScore = detection.severity_score !== undefined ? detection.severity_score : (detection.confidence ?? 0)
   const severityPercent = Math.round(severityScore * 100)
@@ -33,6 +34,7 @@ export function DetectionCard({ detection, index = 0, mode }) {
 
   return (
     <motion.div
+      ref={ref}
       initial={{ opacity: 0, x: -8 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: index * 0.05 }}
@@ -77,7 +79,7 @@ export function DetectionCard({ detection, index = 0, mode }) {
       )}
     </motion.div>
   )
-}
+})
 
 export default DetectionCard
 
