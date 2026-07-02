@@ -140,3 +140,13 @@ backups/
 # Model artifacts (keep if version controlling)
 # runs/
 # final_model/*.pth
+
+
+# Result dataset
+notebooks/results/
+
+# TEST dataset
+05_EXTENDED_DEPTH_SUBSET/
+04_TEST_FROM_DEPTH_MEASURED_SET/
+
+
