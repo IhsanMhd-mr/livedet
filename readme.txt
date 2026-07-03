@@ -39,10 +39,45 @@ LIST
   Strictly held-out evaluation datasets for depth validation against Intel 
   RealSense D415 hardware ground truth.
 
-QUICK START
------------
-1. Set up the Python virtual environment (e.g. `venv-gpu`) and install backend dependencies.
-2. Set up node packages in the `frontend/` directory (`npm install`).
-3. Start the entire system using the root startup script or by running the backend 
-   and frontend concurrently.
+QUICK START & SYSTEM SETUP
+--------------------------
+
+1. Python Backend Dependencies:
+   - Ensure you are inside the project root directory.
+   - Activate your virtual environment (e.g., `venv-gpu` or `.venv`):
+     - On Windows Powershell: `.\venv-gpu\Scripts\Activate.ps1`
+     - On Windows CMD: `.\venv-gpu\Scripts\activate.bat`
+   - Install dependencies listed in backend/requirements.txt:
+     `pip install -r backend/requirements.txt`
+
+2. Node.js & NPM Installation/Updates (Frontend):
+   - Check if Node.js and NPM are installed:
+     `node -v`
+     `npm -v`
+   - If not installed, download and install Node.js from https://nodejs.org/ (which includes NPM).
+   - To update NPM globally to the latest version, run:
+     `npm install -g npm@latest`
+   - Go to the frontend directory:
+     `cd frontend`
+   - Install local node packages:
+     `npm install`
+   - To update existing node packages inside the directory to their latest compatible versions, run:
+     `npm update`
+
+3. Running Components Separately:
+   For complete functionality, open separate terminal windows and run the following commands:
+
+   - Term 1: Run the Flask REST Server (for static image and video processing)
+     `python backend/app.py`
+     - Runs on host: Port 8000 (http://localhost:8000)
+
+   - Term 2: Run the asyncio WebSocket Server (for real-time streaming HUD frame processing)
+     `python backend/live_ws.py`
+     - Runs on host: Port 8765 (ws://localhost:8765)
+
+   - Term 3: Run the React/Vite Frontend Dev Server
+     `cd frontend`
+     `npm run dev`
+     - Runs on local port: http://localhost:5173 (or as indicated in console)
 ================================================================================
+
