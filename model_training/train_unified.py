@@ -1,15 +1,45 @@
 """
 UNIFIED TRAINING SCRIPT - Base Training for Pothole Detection
-Supports: YOLOv10m, YOLOv11m, Custom Training
+Supports: YOLOv8, YOLOv10, YOLO11, Custom Training
 Features: Advanced data augmentation, Multiple model variants, Configuration options
 
-TRAINING WORKFLOW:
-  Stage 1 (BASE TRAINING):  python train_unified.py          → Trains model from scratch
-  Stage 2 (FINE-TUNING):    python fine_tune.py               → Fine-tunes on annotated dataset
+TWO-STAGE TRAINING PARADIGM:
+  We split the training workflow into two distinct stages to balance general visual
+  generalization with target domain specialization.
+
+  Stage 1 (BASE TRAINING) - python train_unified.py:
+    Goal: Trains a model initialized with pre-trained COCO weights on a broad, general 
+          pothole dataset. Helps the model learn generic visual features of potholes 
+          (edges, shapes, shadows) under diverse perspectives.
+    Key Hyperparameters (Default):
+      - Epochs: 100
+      - Image Size (imgsz): 640 (standard training size)
+      - Batch Size: 16
+      - Early Stopping Patience: 20
+      - Mosaic Augmentation Closing: Last 5 epochs (close_mosaic=5)
+      - Augmentations: Custom imgaug pipeline (Scale, Rotate, Fliplr, Shear, Blur)
+
+  Stage 2 (FINE-TUNING) - python fine_tune.py:
+    Goal: Loads the Stage 1 best.pt checkpoint and fine-tunes it on the specialized, 
+          project-specific annotated dataset to adapt it to the target system's deployment environment.
+    Key Hyperparameters (Default):
+      - Checkpoint: best.pt from Stage 1
+      - Epochs: 150
+      - Image Size (imgsz): 800 (higher resolution for fine-detail detection)
+      - Batch Size: 8 (reduced to accommodate higher resolution VRAM footprint)
+      - Early Stopping Patience: 25
+      - Backbone Freezing: First 10 layers (freezes early feature extraction layers to preserve general knowledge)
+      - Learning Rate (lr0): 0.001 (with Cosine Learning Rate Scheduler enabled)
+      - Native Augmentations: mosaic=1.0, mixup=0.15, HSV tuning
+
+  Analogy:
+    Base training teaches the model what a pothole looks like in the general world;
+    fine-tuning teaches it how to detect the specific potholes seen by our cameras.
 
 Usage:
     python train_unified.py                                    # Default: YOLOv10m with augmentation
-    python train_unified.py --model yolov11m --epochs 100      # YOLOv11m
+    python train_unified.py --model yolov8s --epochs 100        # YOLOv8s
+    python train_unified.py --model yolov11m --epochs 100       # YOLOv11m
     python train_unified.py --model yolov10m --no-augment      # Without augmentation
     python train_unified.py --model yolov11m --batch-size 32 --device gpu
 """
@@ -84,23 +114,33 @@ data_yaml = data_dir / 'data.yaml'
 # ═════════════════════════════════════════════════════════════════════════════════
 
 def setup_augmentor():
-    """Setup imgaug augmentation pipeline with random transformations"""
+    """
+    Setup imgaug augmentation pipeline with random transformations.
+    
+    Data augmentation is crucial for small/medium datasets. It introduces artificial 
+    variance, helping the model generalize to different conditions (e.g., lighting, 
+    perspectives, cameras, blur) and reduces overfitting.
+    
+    Returns:
+        iaa.SomeOf: A pipeline that applies a subset of transformations, or None if imgaug is unavailable.
+    """
     if not IMGAUG_AVAILABLE:
         logger.warning("imgaug not available, augmentation disabled")
         return None
     
-    # Randomly applies 2 of 5 augmentation techniques to each image
+    # iaa.SomeOf(2, [...]) randomly selects exactly 2 of the 5 defined transformations
+    # for each image passed through the pipeline, ensuring a variety of combinations.
     augmentor = iaa.SomeOf(2, [    
-        iaa.Affine(scale=(0.8, 1.2)),           # Scale: 80-120%
-        iaa.Affine(rotate=(-15, 15)),           # Rotate: ±15 degrees
-        iaa.Fliplr(1),                          # Horizontal flip
-        iaa.Affine(shear=(-5, 5)),              # Shear: ±5 degrees
-        iaa.GaussianBlur(sigma=(1.0, 3.0)),     # Blur: sigma 1.0-3.0
+        iaa.Affine(scale=(0.8, 1.2)),           # Zoom in/out: Scales image by 80% to 120%
+        iaa.Affine(rotate=(-15, 15)),           # Rotation: Rotates image by -15 to +15 degrees
+        iaa.Fliplr(1),                          # Horizontal Flip: Flips image horizontally (mirror effect)
+        iaa.Affine(shear=(-5, 5)),              # Shear: Tilts the image by -5 to +5 degrees
+        iaa.GaussianBlur(sigma=(1.0, 3.0)),     # Gaussian Blur: Simulates camera out-of-focus or motion blur
     ])
     
     logger.info("")
     logger.info("=" * 80)
-    logger.info("DATA AUGMENTATION PIPELINE")
+    logger.info("DATA AUGMENTATION PIPELINE INITIALIZED")
     logger.info("=" * 80)
     logger.info("✓ Augmentation enabled")
     logger.info("✓ Randomly applies 2 of 5 techniques per image:")
@@ -116,27 +156,38 @@ def setup_augmentor():
 
 
 def analyze_annotation_bbox(annotation_df):
-    """Analyze bounding box dimensions to understand data distribution"""
+    """
+    Analyze bounding box dimensions to understand the spatial distribution of targets.
+    
+    This computes and prints percentiles of 'y_max' (the bottom edge of each bounding box).
+    Knowing where objects are situated vertically in the frame is useful because potholes 
+    are typically located on the road surface, which corresponds to the lower region of images.
+    
+    Args:
+        annotation_df (pd.DataFrame): DataFrame containing annotations with columns 'y' and 'h'.
+    """
     logger.info("")
     logger.info("=" * 80)
     logger.info("BOUNDING BOX ANALYSIS")
     logger.info("=" * 80)
     
+    # Calculate bottom edge of bounding boxes (y + height)
     y_max = annotation_df['y'].values + annotation_df['h'].values
     y_max = np.sort(y_max, axis=None)
     
     logger.info("\nBounding Box Height (y_max) Distribution:")
-    logger.info("  Percentile | Value")
+    logger.info("  Percentile | Value (Pixels)")
     logger.info("  " + "-" * 25)
     
-    # 0-100 by 10
+    # Print deciles (10% increments) to see the overall distribution
     for i in range(0, 101, 10):
         idx = int(len(y_max) * (float(i) / 100))
         idx = min(idx, len(y_max) - 1)
         val = y_max[idx]
         logger.info(f"  {i:3d}%      | {val:.1f}")
     
-    # 90-100 by 1 (fine-grained)
+    # Print detailed percentile distribution from 90% to 100% 
+    # to understand where the largest/lowest potholes reside.
     logger.info("\n  Fine-grained analysis (90-100%):")
     for i in range(90, 101, 1):
         idx = int(len(y_max) * (float(i) / 100))
@@ -150,41 +201,52 @@ def analyze_annotation_bbox(annotation_df):
 
 def augment_img_bbox(annot_df, path, augmentor, img_id, suffix):
     """
-    Augment single image and corresponding bounding boxes
+    Augment a single image and adjust its corresponding bounding boxes.
+    
+    When an image undergoes spatial transformation (rotation, scaling, etc.), the bounding
+    box coordinates must be recalculated to track the target's new position.
     
     Args:
-        annot_df: DataFrame with bounding box coordinates
-        path: Image file path
-        augmentor: imgaug augmentation pipeline
-        img_id: Image ID for lookup
-        suffix: Suffix for augmented image filename
+        annot_df (pd.DataFrame): DataFrame containing all bounding box annotations.
+        path (str): File path of the image to augment.
+        augmentor (iaa.Augmenter): Instantiated imgaug pipeline.
+        img_id (str): The identifier of the target image in the annotations.
+        suffix (str/int): Unique suffix for the output filename to avoid overwriting.
     
     Returns:
-        DataFrame with augmented BBox coordinates
+        pd.DataFrame: DataFrame containing the updated coordinates of the augmented bounding boxes.
     """
+    # 1. Retrieve existing annotations for this image
     bbox_coords = annot_df[annot_df['image_id'] == img_id]
     
     if bbox_coords.empty:
         logger.debug(f"No bboxes for {img_id}")
         return pd.DataFrame(columns=['image_id', 'x', 'y', 'x_max', 'y_max'])
     
+    # 2. Extract bounding box coordinates as [x_min, y_min, x_max, y_max]
     bb_array = bbox_coords.loc[:, ['x', 'y', 'x_max', 'y_max']].values
     
+    # 3. Read image from disk
     try:
         image = imageio.imread(path)
     except Exception as e:
         logger.error(f"Error reading {path}: {e}")
         return pd.DataFrame(columns=['image_id', 'x', 'y', 'x_max', 'y_max'])
     
-    # Apply augmentation
+    # 4. Wrap bounding boxes in imgaug's custom structure
     bbs = BoundingBoxesOnImage.from_xyxy_array(bb_array, shape=image.shape)
+    
+    # 5. Apply the augmentation pipeline to both image and bounding boxes
+    # imgaug updates the bounding boxes coordinates along with the pixels
     image_aug, bbs_aug = augmentor(image=image, bounding_boxes=bbs)
     
-    # Handle bboxes outside image after augmentation
+    # 6. Post-process bounding boxes:
+    # - remove_out_of_image(): Drops any box that is shifted completely outside the canvas.
+    # - clip_out_of_image(): Clips boxes that are partially outside back to the image edges.
     bbs_aug = bbs_aug.remove_out_of_image()
     bbs_aug = bbs_aug.clip_out_of_image()
     
-    # Save augmented image
+    # 7. Save the augmented image to the same directory
     output_dir = Path(path).parent
     output_path = output_dir / f"{img_id}_{suffix}.JPG"
     
@@ -194,14 +256,14 @@ def augment_img_bbox(annot_df, path, augmentor, img_id, suffix):
         logger.error(f"Error saving {output_path}: {e}")
         return pd.DataFrame(columns=['image_id', 'x', 'y', 'x_max', 'y_max'])
     
-    # Convert augmented bboxes to array
+    # 8. Extract the updated bounding box coordinates as an array
     bbs_array = bbs_aug.to_xyxy_array()
     
     if len(bbs_array) == 0:
         logger.debug(f"No bboxes after augmentation for {img_id}")
         return pd.DataFrame(columns=['image_id', 'x', 'y', 'x_max', 'y_max'])
     
-    # Create DataFrame for augmented annotations
+    # 9. Format output DataFrame with the new image ID (original + suffix) and coordinates
     img_id_array = np.empty([bbs_array.shape[0], 1])
     final = np.concatenate((img_id_array, bbs_array), axis=1)
     df = pd.DataFrame(final, columns=['image_id', 'x', 'y', 'x_max', 'y_max'])
@@ -212,22 +274,23 @@ def augment_img_bbox(annot_df, path, augmentor, img_id, suffix):
 
 def augment_data(train_img_df, annot_df, augmentor, num_samples):
     """
-    Augment multiple images from dataset
+    Augment multiple randomly-sampled positive images from the training dataset.
     
     Args:
-        train_img_df: DataFrame with image paths
-        annot_df: DataFrame with bounding box coordinates
-        augmentor: imgaug augmentation pipeline
-        num_samples: Number of images to augment
+        train_img_df (pd.DataFrame): DataFrame listing training images and their paths.
+        annot_df (pd.DataFrame): DataFrame containing annotations.
+        augmentor (iaa.Augmenter): Instantiated imgaug pipeline.
+        num_samples (int): Number of images to augment.
     
     Returns:
-        DataFrame with all augmented BBox coordinates
+        pd.DataFrame: DataFrame containing all generated bounding box coordinates.
     """
     logger.info(f"Starting augmentation of {num_samples} images...")
     
     final_df = pd.DataFrame(columns=['image_id', 'x', 'y', 'x_max', 'y_max'])
     
-    # Filter positive images (with potholes)
+    # Only augment positive images (those containing potholes).
+    # Augmenting negative/background-only images is not useful for object detection.
     positive_images = train_img_df[
         train_img_df['path'].str.contains('positive', case=False)
     ]
@@ -238,20 +301,22 @@ def augment_data(train_img_df, annot_df, augmentor, num_samples):
     
     logger.info(f"Found {len(positive_images)} positive images to sample from")
     
+    # Loop to generate the requested number of augmented samples
     for i in range(num_samples):
-        # Randomly select a positive image
+        # Randomly select a positive image indices
         idx = np.random.randint(len(positive_images), size=1)[0]
         row = positive_images.iloc[idx, :]
         path = row['path']
         img_id = Path(path).stem
         
-        # Augment image and bboxes
+        # Apply the single-image augmentation pipeline
         df = augment_img_bbox(annot_df, path, augmentor, img_id, i)
         
+        # Concatenate successful augmentations to the final DataFrame
         if not df.empty:
             final_df = pd.concat([final_df, df], ignore_index=True)
             
-            # Progress update every 10%
+            # Print a progress indicator at 10% increments
             if (i + 1) % max(1, num_samples // 10) == 0:
                 logger.info(f"  Progress: {i + 1}/{num_samples} images augmented")
     
@@ -261,21 +326,24 @@ def augment_data(train_img_df, annot_df, augmentor, num_samples):
 
 def load_and_prepare_data(augment=True, num_augment=100):
     """
-    Load training data with optional augmentation
+    Load annotations, perform validation steps, and run data augmentation if requested.
+    
+    This prepares the raw CSV dataset into a form compatible with augmentation and returns
+    the final combined dataset.
     
     Args:
-        augment: Whether to perform augmentation
-        num_augment: Number of images to augment
-    
+        augment (bool): If True, run data augmentation.
+        num_augment (int): Number of images to augment.
+        
     Returns:
-        DataFrame with annotations (original + augmented)
+        pd.DataFrame: Cleaned and expanded DataFrame of target bounding boxes.
     """
     logger.info("")
     logger.info("=" * 80)
     logger.info("LOADING & PREPARING TRAINING DATA")
     logger.info("=" * 80)
     
-    # Load annotation data
+    # 1. Load annotation CSV
     annotation_csv = data_dir / 'train_df.csv'
     if not annotation_csv.exists():
         logger.warning(f"Annotation file not found: {annotation_csv}")
@@ -284,7 +352,7 @@ def load_and_prepare_data(augment=True, num_augment=100):
     
     annotation_df = pd.read_csv(str(annotation_csv))
     
-    # Remove duplicates
+    # 2. De-duplicate annotations to remove identical overlapping coordinates
     original_size = len(annotation_df)
     annotation_df.drop_duplicates(keep='first', inplace=True)
     annotation_df.reset_index(inplace=True, drop=True)
@@ -293,37 +361,37 @@ def load_and_prepare_data(augment=True, num_augment=100):
     if duplicates_removed > 0:
         logger.info(f"✓ Removed {duplicates_removed} duplicate annotations")
     
-    # Add x_max and y_max columns (right and bottom edges)
+    # 3. Add explicit x_max and y_max columns (required by imgaug package)
     annotation_df['x_max'] = annotation_df['x'] + annotation_df['w']
     annotation_df['y_max'] = annotation_df['y'] + annotation_df['h']
     
     logger.info(f"✓ Loaded {len(annotation_df)} annotations")
     
-    # Analyze bbox dimensions
+    # 4. Run statistical analysis on bounding box coordinates
     analyze_annotation_bbox(annotation_df)
     
-    # Perform augmentation if enabled
+    # 5. Perform data augmentation if enabled
     if augment and IMGAUG_AVAILABLE:
         logger.info(f"Augmentation enabled: augmenting {num_augment} images...")
         
-        # Load training image paths
+        # Load the CSV file containing paths to images
         train_img_csv = data_dir / 'train_images.csv'
         
         if Path(train_img_csv).exists():
             train_img_df = pd.read_csv(str(train_img_csv))
             logger.info(f"✓ Loaded {len(train_img_df)} training image paths")
             
-            # Setup augmentor
+            # Setup augmentor pipeline
             augmentor = setup_augmentor()
             
-            # Perform augmentation
+            # Generate augmented images & boxes
             augmented_df = augment_data(train_img_df, annotation_df, augmentor, num_augment)
             
             if not augmented_df.empty:
-                # Merge augmented data with original
+                # Merge augmented samples with the original dataset
                 annotation_df = pd.concat([annotation_df, augmented_df], ignore_index=True)
                 
-                # Save augmented annotations
+                # Save the new bounding boxes to disk for reference/verification
                 augmented_output = data_dir / 'augmented_annotations.csv'
                 augmented_df.to_csv(str(augmented_output), index=False)
                 logger.info(f"✓ Saved augmented annotations: {augmented_output}")
@@ -346,120 +414,93 @@ def load_and_prepare_data(augment=True, num_augment=100):
 
 
 # ═════════════════════════════════════════════════════════════════════════════════
-# MODEL TRAINING FUNCTIONS - BASE TRAINING (From Scratch)
+# MODEL TRAINING FUNCTIONS - BASE TRAINING (From Scratch / Pre-trained COCO)
 # ═════════════════════════════════════════════════════════════════════════════════
 
-def train_yolov10m_base(epochs, batch_size, device, patience):
-    """Train YOLOv10m model from scratch (Base Training)
+def train_yolo_base(model_name, epochs, batch_size, device, patience):
+    """
+    Train any supported YOLO model (YOLOv8, YOLOv10, YOLO11) from scratch/pretrained COCO checkpoint.
     
-    This is for initial model training from pretrained weights.
-    For fine-tuning on annotated data, use fine_tune.py instead.
+    This function handles name mapping, loads weights, and runs the training loop using 
+    standard hyperparameters.
+    
+    Args:
+        model_name (str): Name of the model to train (e.g., 'yolov8s', 'yolo11s').
+        epochs (int): Max number of complete training passes over the dataset.
+        batch_size (int): Batch size (images per optimization step).
+        device (str): Computation device ('cpu', 'gpu', or specific GPU index like '0').
+        patience (int): Early stopping patience (stop training if no improvement for N epochs).
+        
+    Returns:
+        ultralytics.utils.metrics.DetMetrics: Training results/metrics object, or None if failed.
     """
     logger.info("")
     logger.info("=" * 80)
-    logger.info("BASE TRAINING: YOLOv10m (From Scratch)")
+    logger.info(f"BASE TRAINING: {model_name.upper()} (From Scratch / Pre-trained COCO)")
     logger.info("=" * 80)
     logger.info(f"Configuration:")
-    logger.info(f"  Epochs: {epochs}")
+    logger.info(f"  Model:      {model_name}")
+    logger.info(f"  Epochs:     {epochs}")
     logger.info(f"  Batch size: {batch_size}")
-    logger.info(f"  Device: {device}")
-    logger.info(f"  Patience: {patience}")
-    logger.info(f"  Dataset: {data_yaml}")
+    logger.info(f"  Device:     {device}")
+    logger.info(f"  Patience:   {patience}")
+    logger.info(f"  Dataset:    {data_yaml}")
     logger.info("")
     
-    logger.info("Loading YOLOv10m model...")
-    model = YOLO('yolov10m.pt')
-    logger.info("✓ Model loaded")
-    logger.info("")
+    # Map the model_name to the correct weights filename.
+    # Ultralytics naming convention: YOLO11 weights are yolo11*.pt (no 'v').
+    # YOLOv8 and YOLOv10 weights are yolov8*.pt and yolov10*.pt respectively.
+    weights_name = model_name
+    if weights_name.startswith('yolov11'):
+        weights_name = weights_name.replace('yolov11', 'yolo11')
     
-    logger.info("Starting training...")
+    # Append .pt if not present
+    if not weights_name.endswith('.pt'):
+        weights_name = f"{weights_name}.pt"
+        
+    logger.info(f"Loading {weights_name} weights...")
     try:
-        results = model.train(
-            data=str(data_yaml),
-            epochs=epochs,
-            imgsz=640,
-            batch=batch_size,
-            device=device,
-            patience=patience,
-            save=True,
-            project=str(project_root / 'runs' / 'base_models'),
-            name='pothole_detector_yolov10m',
-            workers=int(os.getenv('NUM_WORKERS', 2)),
-            close_mosaic=5,
-            plots=False,
-        )
-        
+        model = YOLO(weights_name)
+        logger.info("✓ Model loaded successfully")
         logger.info("")
-        logger.info("=" * 80)
-        logger.info("✓ YOLOv10m BASE TRAINING COMPLETE")
-        logger.info("="*80)
-        logger.info(f"Results: runs/base_models/pothole_detector_yolov10m/")
-        logger.info(f"Best model: runs/base_models/pothole_detector_yolov10m/weights/best.pt")
-        logger.info(f"\nNext: Use fine_tune.py to fine-tune on annotated dataset")
-        
-        return results
-        
     except Exception as e:
-        logger.error(f"Training failed: {e}")
-        import traceback
-        traceback.print_exc()
+        logger.error(f"Failed to load model weights '{weights_name}': {e}")
         return None
-
-
-def train_yolo11_base(epochs, batch_size, device, patience, model_size='m'):
-    """Train YOLO11 model from scratch (Base Training)
-    
-    This is for initial model training from pretrained weights.
-    For fine-tuning on annotated data, use fine_tune.py instead.
-    """
-    logger.info("")
-    logger.info("=" * 80)
-    logger.info(f"BASE TRAINING: YOLO11{model_size} (From Scratch)")
-    logger.info("=" * 80)
-    logger.info(f"Configuration:")
-    logger.info(f"  Model: YOLO11{model_size}")
-    logger.info(f"  Epochs: {epochs}")
-    logger.info(f"  Batch size: {batch_size}")
-    logger.info(f"  Device: {device}")
-    logger.info(f"  Patience: {patience}")
-    logger.info(f"  Dataset: {data_yaml}")
-    logger.info("")
-    
-    model_name = f'yolo11{model_size}'
-    logger.info(f"Loading {model_name} model...")
-    model = YOLO(f'{model_name}.pt')
-    logger.info("✓ Model loaded")
-    logger.info("")
     
     logger.info("Starting training...")
     try:
         results = model.train(
-            data=str(data_yaml),
-            epochs=epochs,
-            imgsz=640,
-            batch=batch_size,
-            device=device,
-            patience=patience,
-            save=True,
-            project=str(project_root / 'runs' / 'base_models'),
-            name=f'pothole_detector_yolo11{model_size}',
-            workers=int(os.getenv('NUM_WORKERS', 2)),
-            close_mosaic=5,
-            plots=False,
+            data=str(data_yaml),            # Path to dataset configuration YAML
+            epochs=epochs,                  # Maximum number of epochs
+            imgsz=640,                      # Resolution to resize input images to
+            batch=batch_size,               # Number of images per batch
+            device=device,                  # GPU or CPU
+            patience=patience,              # Epoch count to wait before early stopping
+            save=True,                      # Save checkpoint weights and results
+            project=str(project_root / 'runs' / 'base_models'),  # Directory to save runs
+            name=f'pothole_detector_{model_name}',               # Run directory name
+            workers=int(os.getenv('NUM_WORKERS', 2)),           # CPU workers for data loading
+            
+            # close_mosaic=5 disables mosaic augmentation in the final 5 epochs.
+            # Mosaic augmentation is excellent for general context, but can introduce
+            # artificial boundaries that degrade precise bbox coordinates. Disabling it
+            # at the end allows the model to refine bounding box alignment.
+            close_mosaic=5,                 
+            plots=True,                     # Enable generating plots during training to track progress
         )
         
         logger.info("")
         logger.info("=" * 80)
-        logger.info(f"✓ YOLO11{model_size} BASE TRAINING COMPLETE")
-        logger.info("="*80)
-        logger.info(f"Results: runs/base_models/pothole_detector_yolo11{model_size}/")
-        logger.info(f"Best model: runs/base_models/pothole_detector_yolo11{model_size}/weights/best.pt")
+        logger.info(f"✓ {model_name.upper()} BASE TRAINING COMPLETE")
+        logger.info("=" * 80)
+        logger.info(f"Results: runs/base_models/pothole_detector_{model_name}/")
+        logger.info(f"Best model: runs/base_models/pothole_detector_{model_name}/weights/best.pt")
         logger.info(f"\nNext: Use fine_tune.py to fine-tune on annotated dataset")
         
         return results
         
     except Exception as e:
-        logger.error(f"Training failed: {e}")
+        logger.error(f"Training failed for {model_name}: {e}")
         import traceback
         traceback.print_exc()
         return None
@@ -470,14 +511,20 @@ def train_yolo11_base(epochs, batch_size, device, patience, model_size='m'):
 # ═════════════════════════════════════════════════════════════════════════════════
 
 def parse_arguments():
-    """Parse command-line arguments for BASE TRAINING"""
+    """
+    Parse command-line arguments to configure training runs.
+    
+    Returns:
+        argparse.Namespace: Object containing the parsed arguments.
+    """
     parser = argparse.ArgumentParser(
         description="Base training script with data augmentation for pothole detection (from scratch)",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
   python train_unified.py                                    # YOLOv10m + augmentation (default)
-  python train_unified.py --model yolov11m --epochs 100      # YOLOv11m
+  python train_unified.py --model yolov8s --epochs 100        # YOLOv8s
+  python train_unified.py --model yolov11s --epochs 100       # YOLOv11s
   python train_unified.py --augment --num-augment 200        # More augmentation
   python train_unified.py --no-augment                       # Without augmentation
 
@@ -489,23 +536,27 @@ NOTE: For fine-tuning on annotated data, use: python fine_tune.py
         '--model',
         type=str,
         default='yolov10m',
-        choices=['yolov10m', 'yolov11n', 'yolov11s', 'yolov11m', 'yolov11l', 'yolov11x',
-                 'yolo11n', 'yolo11s', 'yolo11m', 'yolo11l', 'yolo11x'],
-        help='Model to train (default: yolov10m)'
+        choices=[
+            'yolov8n', 'yolov8s', 'yolov8m', 'yolov8l', 'yolov8x',
+            'yolov10n', 'yolov10s', 'yolov10m', 'yolov10l', 'yolov10x',
+            'yolov11n', 'yolov11s', 'yolov11m', 'yolov11l', 'yolov11x',
+            'yolo11n', 'yolo11s', 'yolo11m', 'yolo11l', 'yolo11x'
+        ],
+        help='Model architecture variant to train (default: yolov10m)'
     )
     
     parser.add_argument(
         '--epochs',
         type=int,
         default=100,
-        help='Number of training epochs (default: 100)'
+        help='Maximum number of training epochs (default: 100)'
     )
     
     parser.add_argument(
         '--batch-size',
         type=int,
         default=16,
-        help='Batch size for training (default: 16)'
+        help='Batch size (images per step; default: 16)'
     )
     
     parser.add_argument(
@@ -513,28 +564,28 @@ NOTE: For fine-tuning on annotated data, use: python fine_tune.py
         type=str,
         default='gpu',
         choices=['cpu', 'gpu', '0', '1'],
-        help='Device to train on (default: gpu)'
+        help='Execution device. Use GPU for training acceleration (default: gpu)'
     )
     
     parser.add_argument(
         '--patience',
         type=int,
         default=20,
-        help='Early stopping patience in epochs (default: 20)'
+        help='Early stopping patience count in epochs (default: 20)'
     )
     
     parser.add_argument(
         '--augment',
         action='store_true',
         default=True,
-        help='Enable data augmentation (enabled by default)'
+        help='Enable random transformations (enabled by default)'
     )
     
     parser.add_argument(
         '--no-augment',
         action='store_false',
         dest='augment',
-        help='Disable data augmentation'
+        help='Disable data augmentation transformations'
     )
     
     parser.add_argument(
@@ -552,14 +603,19 @@ NOTE: For fine-tuning on annotated data, use: python fine_tune.py
 # ═════════════════════════════════════════════════════════════════════════════════
 
 def main():
-    """Main training function"""
+    """
+    Main orchestrator for the base model training.
     
-    # Verify data.yaml exists
+    Validates files, processes dataset details, triggers augmentation if active, 
+    and launches the selected YOLO base training routine.
+    """
+    
+    # 1. Verify existence of the YOLO dataset definition YAML
     if not data_yaml.exists():
         logger.error(f"data.yaml not found: {data_yaml}")
         sys.exit(1)
     
-    # Parse arguments
+    # 2. Parse execution flags
     args = parse_arguments()
     
     logger.info("")
@@ -571,15 +627,17 @@ def main():
     logger.info(f"Augmentation: {'✓ Enabled' if args.augment else '✗ Disabled'}")
     logger.info("=" * 80)
     
-    # Load and prepare data
+    # 3. Load input datasets, perform cleaning, and run augmentation if active
     load_and_prepare_data(augment=args.augment, num_augment=args.num_augment)
     
-    # Train model from scratch
-    if args.model == 'yolov10m':
-        train_yolov10m_base(args.epochs, args.batch_size, args.device, args.patience)
-    elif args.model.startswith('yolov11') or args.model.startswith('yolo11'):
-        model_size = args.model.replace('yolov11', '').replace('yolo11', '')
-        train_yolo11_base(args.epochs, args.batch_size, args.device, args.patience, model_size)
+    # 4. Train the selected YOLO model version using the unified training function
+    train_yolo_base(
+        model_name=args.model,
+        epochs=args.epochs,
+        batch_size=args.batch_size,
+        device=args.device,
+        patience=args.patience
+    )
     
     logger.info("")
     logger.info("=" * 80)
@@ -587,7 +645,7 @@ def main():
     logger.info("=" * 80)
     logger.info("")
     logger.info("Next steps:")
-    logger.info("  1. Verify model performance at: runs/base_models/pothole_detector_yolov*")
+    logger.info("  1. Verify model performance at: runs/base_models/pothole_detector_yolov* or yolo11*")
     logger.info("  2. For fine-tuning on annotated data, run: python fine_tune.py")
     logger.info("=" * 80)
 

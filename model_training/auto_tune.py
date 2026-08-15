@@ -1,7 +1,13 @@
 """
-AUTOMATED FINE-TUNING LOOP
-Iteratively trains YOLO11s on the cleaned dataset, checks if validation mAP@50
-reaches the 85% target, and if not, automatically adjusts parameters and trains again.
+AUTOMATED HYPERPARAMETER TUNING LOOP
+Iteratively trains a YOLO model on the cleaned dataset, checks if validation mAP@50
+reaches the target (e.g. 85%), and if not, automatically adjusts hyperparameters
+and triggers subsequent training rounds.
+
+This script implements a heuristic-driven parameter search strategy that adjusts:
+  1. Learning Rate (LR): Progressively reduced to avoid overshooting local minima.
+  2. Image Resolution (imgsz): Increased in later rounds to detect finer details.
+  3. Freeze Layers: Gradually unfrozen to allow deeper feature extractor adaptation.
 
 Usage:
     python model_training/auto_tune.py --target-map 0.85 --max-rounds 3
@@ -29,7 +35,20 @@ except ImportError:
 
 
 def run_training_round(checkpoint_path, round_num, lr, imgsz, freeze, epochs=60):
-    """Runs a single fine-tuning round and returns the best model path and its mAP@50 score."""
+    """
+    Runs a single fine-tuning round with the specified hyperparameters.
+    
+    Args:
+        checkpoint_path (str): Path to starting weights (.pt file).
+        round_num (int): Current tuning iteration index.
+        lr (float): Initial learning rate (lr0).
+        imgsz (int): Image training and validation resolution.
+        freeze (int): Number of backbone layers to freeze from the bottom.
+        epochs (int): Number of training epochs for this round.
+        
+    Returns:
+        tuple: (best_weights_path, map50_score) achieved in this round.
+    """
     output_name = f"pothole_yolo11s_autotune_r{round_num}"
     logger.info(f"\n" + "=" * 80)
     logger.info(f"STARTING AUTOTUNE ROUND {round_num}")
@@ -42,26 +61,28 @@ def run_training_round(checkpoint_path, round_num, lr, imgsz, freeze, epochs=60)
 
     model = YOLO(str(checkpoint_path))
 
-    # We use a solid augmentation profile for all rounds
+    # Trigger training using Ultralytics engine with specified hyperparameter overrides
     results = model.train(
         data=str(data_yaml),
         epochs=epochs,
         imgsz=imgsz,
         batch=8,
         device=0,
-        patience=15,  # Slightly shorter patience to keep autotune loops fast
+        patience=15,  # Shorter patience to prevent redundant epochs in autotuning
         save=True,
         project=str(project_root / 'runs' / 'base_models'),
         name=output_name,
         workers=2,
         close_mosaic=5,
         plots=True,
-        freeze=freeze,
+        freeze=freeze,       # Overriden layer freeze hyperparameter
+        
         # Hyperparameters
-        lr0=lr,
-        lrf=0.01,
-        warmup_epochs=3,
-        cos_lr=True,
+        lr0=lr,              # Overriden initial learning rate
+        lrf=0.01,            # Final learning rate fraction (lrf * lr0 is final LR)
+        warmup_epochs=3,     # Gradual warmup period
+        cos_lr=True,         # Cosine learning rate decay scheduler
+        
         # Native augmentations
         mosaic=1.0,
         mixup=0.15,
@@ -70,7 +91,7 @@ def run_training_round(checkpoint_path, round_num, lr, imgsz, freeze, epochs=60)
         hsv_v=0.4,
     )
 
-    # Perform evaluation at the final resolution
+    # Perform formal evaluation at the final target resolution
     logger.info(f"\nEvaluating Round {round_num} results...")
     best_weights = project_root / 'runs' / 'base_models' / output_name / 'weights' / 'best.pt'
     if not best_weights.exists():
@@ -84,6 +105,7 @@ def run_training_round(checkpoint_path, round_num, lr, imgsz, freeze, epochs=60)
         plots=False,
     )
 
+    # Extract mAP@50 metric for check against goal
     map50 = float(metrics.results_dict.get('metrics/mAP50(B)', 0))
     logger.info(f"\nRound {round_num} Finished. Validation mAP@50: {map50:.4f} ({map50*100:.2f}%)")
     return best_weights, map50
@@ -96,7 +118,7 @@ def main():
     parser.add_argument('--max-rounds', type=int, default=3, help='Maximum fine-tuning iterations')
     args = parser.parse_args()
 
-    # Determine initial checkpoint
+    # Determine starting checkpoint
     initial_checkpoint = args.checkpoint
     if not initial_checkpoint:
         default_pt = project_root / 'runs' / 'base_models' / 'pothole_detector_yolo11s' / 'weights' / 'best.pt'
@@ -107,16 +129,18 @@ def main():
 
     logger.info(f"Starting autotune script. Target: {args.target_map*100:.1f}% mAP@50")
 
+    # Round 1 default parameters
     current_weights = initial_checkpoint
     current_lr = 0.0015
     current_imgsz = 800
     current_freeze = 10
     
-    # Pre-defined tuning adjustment roadmap for subsequent rounds
+    # Pre-defined tuning roadmap. If a round fails to hit the target,
+    # the loop moves to the next dictionary to run the next round.
     adjustments = [
-        # Round 2 adjustments if Target not reached
+        # Round 2: Reduce LR, unfreeze 2 extra layers (freeze 8 instead of 10) to let more parameters adapt.
         {'lr': 0.0008, 'imgsz': 800, 'freeze': 8,   'epochs': 50}, 
-        # Round 3 adjustments
+        # Round 3: Further reduce LR, increase resolution to 960 to capture micro-details, freeze only 5 layers.
         {'lr': 0.0004, 'imgsz': 960, 'freeze': 5,   'epochs': 50}, 
     ]
 
@@ -136,7 +160,7 @@ def main():
 
         current_weights = best_path
 
-        # Check if target reached
+        # Success condition check
         if map50 >= args.target_map:
             logger.info("\n" + "=" * 80)
             logger.info(f"🎯 SUCCESS: Target mAP@50 ({args.target_map*100:.1f}%) reached!")
@@ -146,8 +170,8 @@ def main():
         else:
             logger.warning(f"\n⚠️ Target not met ({map50*100:.1f}% < {args.target_map*100:.1f}%)")
             
+            # If we haven't exceeded maximum rounds, load parameters for the next round
             if round_num < args.max_rounds:
-                # Apply next set of hyperparameter adjustments
                 next_adj = adjustments[round_num-1]
                 current_lr = next_adj['lr']
                 current_imgsz = next_adj['imgsz']

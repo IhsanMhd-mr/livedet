@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "clean": "powershell -Command \"@(5173,8765) | ForEach-Object { $port=$_; $procId=(Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue).OwningProcess; if($procId){Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue; Write-Host \\\"Killed port $port (PID $procId)\\\"} else {Write-Host \\\"Port $port is free\\\"} }\"",
+    "clean": "powershell -Command \"@(5173,8000,8765) | ForEach-Object { $port=$_; $procId=(Get-NetTCPConnection -LocalPort $port -ErrorAction SilentlyContinue).OwningProcess; if($procId){Stop-Process -Id $procId -Force -ErrorAction SilentlyContinue; Write-Host \\\"Killed port $port (PID $procId)\\\"} else {Write-Host \\\"Port $port is free\\\"} }\"",
     "start": "npm run clean && cd frontend && npm run start:all"
   }
 }

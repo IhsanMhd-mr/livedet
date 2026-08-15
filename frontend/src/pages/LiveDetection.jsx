@@ -6,9 +6,9 @@ import DetectionCard from '@/components/ui/DetectionCard'
 import toast from 'react-hot-toast'
 
 const SEVERITY_COLORS = {
-  Low:      '#10b981',
-  Medium:   '#eab308',
-  High:     '#f97316',
+  Low: '#10b981',
+  Medium: '#eab308',
+  High: '#f97316',
   Critical: '#ef4444',
 }
 
@@ -128,15 +128,15 @@ export default function LiveDetection() {
   const [proximityThreshold, setProximityThreshold] = useState(3.0)
   const [isAlertActive, setIsAlertActive] = useState(false)
 
-  const videoRef        = useRef(null)
+  const videoRef = useRef(null)
   const displayCanvasRef = useRef(null)
   const captureCanvasRef = useRef(null)
-  const streamRef       = useRef(null)
+  const streamRef = useRef(null)
   const frameIntervalRef = useRef(null)
-  const animFrameRef    = useRef(null)
-  const detectionsRef   = useRef([])
-  const wsConnectedRef  = useRef(false)
-  const dropdownRef      = useRef(null)
+  const animFrameRef = useRef(null)
+  const detectionsRef = useRef([])
+  const wsConnectedRef = useRef(false)
+  const dropdownRef = useRef(null)
 
   // Refs for access in animation frame loop without stale closures
   const audioAlertEnabledRef = useRef(audioAlertEnabled)
@@ -203,23 +203,23 @@ export default function LiveDetection() {
       if (!AudioContext) return
       const ctx = new AudioContext()
       const now = ctx.currentTime
-      
+
       const playTone = (time, freq, dur) => {
         const osc = ctx.createOscillator()
         const gain = ctx.createGain()
         osc.type = 'sine'
         osc.frequency.setValueAtTime(freq, time)
-        
+
         gain.gain.setValueAtTime(0, time)
         gain.gain.linearRampToValueAtTime(0.3, time + 0.02)
         gain.gain.exponentialRampToValueAtTime(0.001, time + dur)
-        
+
         osc.connect(gain)
         gain.connect(ctx.destination)
         osc.start(time)
         osc.stop(time + dur)
       }
-      
+
       // Urgent, clean double-beep ADAS sound
       playTone(now, 920, 0.12)
       playTone(now + 0.18, 920, 0.15)
@@ -298,7 +298,7 @@ export default function LiveDetection() {
       if (!active) return
 
       const canvas = displayCanvasRef.current
-      const video  = videoRef.current
+      const video = videoRef.current
 
       if (wsConnectedRef.current && canvas && video && video.srcObject) {
         // Only set width/height once or if video size changes to avoid clearing canvas
@@ -318,7 +318,7 @@ export default function LiveDetection() {
           for (const d of detectionsRef.current) {
             if (!d.bbox) continue
             const [bx, by, bw, bh] = d.bbox
-            
+
             const isHighSeverity = d.severity === 'High' || d.severity === 'Critical'
             const dist = d.distance_m ?? 5.0
             const isHazard = isHighSeverity && dist <= proximityThresholdRef.current
@@ -356,7 +356,7 @@ export default function LiveDetection() {
             ]
             ctx.font = 'bold 12px "Outfit","Inter","Segoe UI",sans-serif'
             ctx.textBaseline = 'top'
-            const lh  = 16, pad = 5
+            const lh = 16, pad = 5
             const lblW = Math.max(...lines.map((l) => ctx.measureText(l).width)) + pad * 2 + 4
             const lblH = lh * lines.length + pad * 2
             const lblY = by - lblH - 2 > 0 ? by - lblH - 2 : by + bh + 2
@@ -372,10 +372,10 @@ export default function LiveDetection() {
       }
       animFrameRef.current = requestAnimationFrame(draw)
     }
-    
+
     // Start drawing
     animFrameRef.current = requestAnimationFrame(draw)
-    
+
     return () => {
       active = false
       if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current)
@@ -384,16 +384,16 @@ export default function LiveDetection() {
 
   // ── Send loop ────────────────────────────────────────────────────────────
   const beginSendLoop = () => {
-    const cc    = captureCanvasRef.current
+    const cc = captureCanvasRef.current
     const video = videoRef.current
     if (!cc || !video) return
     const ctx = cc.getContext('2d')
-    cc.width  = video.videoWidth  || 640
+    cc.width = video.videoWidth || 640
     cc.height = video.videoHeight || 480
 
     frameIntervalRef.current = setInterval(() => {
       if (!wsConnectedRef.current || !video.srcObject) return
-      
+
       try {
         ctx.drawImage(video, 0, 0, cc.width, cc.height)
         const dataUrl = cc.toDataURL('image/jpeg', 0.70)
@@ -416,7 +416,7 @@ export default function LiveDetection() {
       // Clear send interval but keep camera open while retrying connection
       clearInterval(frameIntervalRef.current)
       frameIntervalRef.current = null
-      
+
       // Stop camera only if we have hit complete error / stop state or exhausted retries
       if (hasReconnectExhausted || wsStatus === 'error') {
         stopCamera()
@@ -459,11 +459,10 @@ export default function LiveDetection() {
           <p className="mt-1 text-sm text-slate-400">
             {uiDescription}
             {isConnected && (
-              <span className={`ml-2.5 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium border ${
-                depthActive
+              <span className={`ml-2.5 inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-xs font-medium border ${depthActive
                   ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
                   : 'bg-amber-500/10 border-amber-500/20 text-amber-400'
-              }`}>
+                }`}>
                 <span className={`h-1.5 w-1.5 rounded-full ${depthActive ? 'bg-emerald-400' : 'bg-amber-400 animate-pulse'}`} />
                 Depth: {depthActive ? 'Active (MiDaS)' : 'Loading…'}
               </span>
@@ -480,9 +479,8 @@ export default function LiveDetection() {
               type="button"
               disabled={isConnected || isConnecting}
               onClick={() => setIsDropdownOpen(!isDropdownOpen)}
-              className={`flex items-center gap-2 rounded-xl border border-white/5 bg-surface-800/40 backdrop-blur-md px-4 py-2.5 text-xs font-semibold text-white transition-all hover:bg-surface-800/60 focus:outline-none focus:ring-1 focus:ring-brand-500/50 ${
-                (isConnected || isConnecting) ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'
-              }`}
+              className={`flex items-center gap-2 rounded-xl border border-white/5 bg-surface-800/40 backdrop-blur-md px-4 py-2.5 text-xs font-semibold text-white transition-all hover:bg-surface-800/60 focus:outline-none focus:ring-1 focus:ring-brand-500/50 ${(isConnected || isConnecting) ? 'opacity-70 cursor-not-allowed' : 'cursor-pointer'
+                }`}
             >
               <span>{activePresetObj.name}</span>
               <svg
@@ -510,7 +508,7 @@ export default function LiveDetection() {
                   <div className="space-y-1">
                     {VEHICLE_PRESETS.map((preset) => {
                       const isSelected = preset.id === selectedPreset
-                      
+
                       if (preset.active) {
                         return (
                           <button
@@ -520,11 +518,10 @@ export default function LiveDetection() {
                               setSelectedPreset(preset.id)
                               setIsDropdownOpen(false)
                             }}
-                            className={`w-full flex items-center justify-between rounded-xl p-2 text-left transition-colors border ${
-                              isSelected 
-                                ? 'bg-brand-500/20 text-white border-brand-500/30' 
+                            className={`w-full flex items-center justify-between rounded-xl p-2 text-left transition-colors border ${isSelected
+                                ? 'bg-brand-500/20 text-white border-brand-500/30'
                                 : 'hover:bg-white/5 text-slate-300 border-transparent'
-                            }`}
+                              }`}
                           >
                             <div>
                               <p className="font-semibold text-xs text-white leading-tight">{preset.name}</p>
@@ -546,7 +543,7 @@ export default function LiveDetection() {
                               <p className="text-[9px] text-slate-500 mt-0.5 font-mono">{preset.dimensions}</p>
                             </div>
                             <span className="text-[10px] mr-1">🔒</span>
-                            
+
                             {/* Hover tooltip for future scope */}
                             <div className="absolute hidden group-hover:flex flex-col items-center pointer-events-none z-[110] right-full top-1/2 -translate-y-1/2 mr-3 w-48">
                               <div className="bg-slate-950/95 border border-white/10 text-white text-[11px] rounded-xl p-2.5 shadow-2xl backdrop-blur-md text-center">
@@ -675,8 +672,8 @@ export default function LiveDetection() {
           {/* Stats */}
           <div className="grid grid-cols-3 gap-3">
             {[
-              { label: 'Status',     value: uiStatusLabel },
-              { label: 'FPS',        value: isConnected ? fps : '—' },
+              { label: 'Status', value: uiStatusLabel },
+              { label: 'FPS', value: isConnected ? fps : '—' },
               { label: 'Detections', value: detections.length },
             ].map(({ label, value }) => (
               <div key={label} className="rounded-xl border border-white/5 bg-surface-800/60 p-3 text-center">
@@ -702,7 +699,7 @@ export default function LiveDetection() {
                 </span>
               )}
             </div>
-            
+
             <div className="space-y-4">
               {/* Audio alert toggle switch */}
               <div className="flex items-center justify-between">
@@ -724,14 +721,12 @@ export default function LiveDetection() {
                   <button
                     type="button"
                     onClick={() => setAudioAlertEnabled(!audioAlertEnabled)}
-                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${
-                      audioAlertEnabled ? 'bg-brand-500' : 'bg-slate-700'
-                    }`}
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none ${audioAlertEnabled ? 'bg-brand-500' : 'bg-slate-700'
+                      }`}
                   >
                     <span
-                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                        audioAlertEnabled ? 'translate-x-6' : 'translate-x-1'
-                      }`}
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${audioAlertEnabled ? 'translate-x-6' : 'translate-x-1'
+                        }`}
                     />
                   </button>
                 </div>
@@ -770,28 +765,28 @@ export default function LiveDetection() {
                 )}
               </h2>
             </div>
-          <div className="max-h-[520px] space-y-2 overflow-y-auto pr-1">
-            <AnimatePresence mode="popLayout">
-              {detections.length > 0 ? (
-                detections.map((d, i) => (
-                  <DetectionCard key={`${d.class_name ?? i}-${i}`} detection={d} index={i} />
-                ))
-              ) : (
-                <motion.div
-                  key="empty"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="flex flex-col items-center justify-center rounded-xl border border-white/5 bg-surface-800/20 py-12 text-slate-600"
-                >
-                  <svg className="mb-2 h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
-                  </svg>
-                  <p className="text-xs">No detections yet</p>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+            <div className="max-h-[520px] space-y-2 overflow-y-auto pr-1">
+              <AnimatePresence mode="popLayout">
+                {detections.length > 0 ? (
+                  detections.map((d, i) => (
+                    <DetectionCard key={`${d.class_name ?? i}-${i}`} detection={d} index={i} />
+                  ))
+                ) : (
+                  <motion.div
+                    key="empty"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                    exit={{ opacity: 0 }}
+                    className="flex flex-col items-center justify-center rounded-xl border border-white/5 bg-surface-800/20 py-12 text-slate-600"
+                  >
+                    <svg className="mb-2 h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1}>
+                      <path strokeLinecap="round" strokeLinejoin="round" d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z" />
+                    </svg>
+                    <p className="text-xs">No detections yet</p>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
           </div>
         </div>
       </div>
