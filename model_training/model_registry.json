@@ -1,0 +1,68 @@
+{
+  "_comment": "Persistent record of YOLO training/fine-tune runs and which run is the current champion per architecture. Populated by model_training/finetune_depthsense.ipynb. weights always point inside runs/base_models/ -- this file never references models/finetuned/ (that folder is a manual, user-owned backup and is off-limits to notebooks/scripts).",
+  "champions": {
+    "yolov8": "yolov8s_fresh",
+    "yolov11": "pothole_detector_yolo11s_v22"
+  },
+  "promotion_policy": {
+    "primary_metric": "map50",
+    "secondary_metric": "recall",
+    "max_inference_ms_regression": 5.0,
+    "_note": "A candidate run must beat the current champion (same architecture) on primary_metric, must not regress secondary_metric, and must not regress speed_inference_ms by more than max_inference_ms_regression. Meeting the policy only produces a recommendation -- promotion itself is a separate, human-triggered, commented-out notebook cell."
+  },
+  "runs": [
+    {
+      "name": "yolov8s_fresh",
+      "architecture": "yolov8",
+      "status": "champion",
+      "dataset": "clean_dataset",
+      "base_checkpoint": null,
+      "timestamp": "2026-08-15T15:05:54Z",
+      "notes": "Seeded from existing runs/base_models/yolov8s_fresh/results.csv (final logged epoch). Only 3 epochs recorded -- appears to be an early/interrupted run, not a fully converged baseline.",
+      "metrics": {
+        "precision": 0.39821,
+        "recall": 0.29977,
+        "map50": 0.26039,
+        "map50_95": 0.11143,
+        "speed_inference_ms": null,
+        "file_size_mb": 64.1
+      },
+      "weights": "runs/base_models/yolov8s_fresh/weights/best.pt"
+    },
+    {
+      "name": "pothole_detector_yolo11s_v22",
+      "architecture": "yolov11",
+      "status": "champion",
+      "dataset": "clean_dataset",
+      "base_checkpoint": "pothole_detector_yolo11s",
+      "timestamp": "2026-08-15T15:05:54Z",
+      "notes": "Seeded from existing runs/base_models/pothole_detector_yolo11s_v22/results.csv (final logged epoch, 45/150 -- training stopped early via patience). This is the current production model referenced by .env BEST_MODEL_PATH.",
+      "metrics": {
+        "precision": 0.6942,
+        "recall": 0.65505,
+        "map50": 0.71684,
+        "map50_95": 0.40865,
+        "speed_inference_ms": null,
+        "file_size_mb": 18.32
+      },
+      "weights": "runs/base_models/pothole_detector_yolo11s_v22/weights/best.pt"
+    },
+    {
+      "name": "pothole_detector_yolo11s_depthsense_v1",
+      "architecture": "yolov11",
+      "status": "experiment",
+      "dataset": "06_DEPTHSENSE_STATIC_DATASET",
+      "base_checkpoint": "pothole_detector_yolo11s_v22",
+      "timestamp": "2026-08-15T22:04:36.758609+00:00",
+      "metrics": {
+        "precision": 0.8286763806477859,
+        "recall": 0.92,
+        "map50": 0.932488790962634,
+        "map50_95": 0.6160533992775202,
+        "speed_inference_ms": 20.650444000493735,
+        "file_size_mb": 37.43997669219971
+      },
+      "weights": "runs\\base_models\\pothole_detector_yolo11s_depthsense_v1\\weights\\best.pt"
+    }
+  ]
+}
