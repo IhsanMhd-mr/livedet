@@ -72,6 +72,8 @@ runs/
 .DS_Store
 Thumbs.db
 Desktop.ini
+.claude
+.next
 
 # Logs
 *.log
