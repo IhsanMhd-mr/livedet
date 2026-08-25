@@ -72,8 +72,12 @@ runs/
 .DS_Store
 Thumbs.db
 Desktop.ini
-.claude
 .next
+
+# AI agent files
+CLAUDE.md
+AGENTS.md
+.claude/
 
 # Logs
 *.log
